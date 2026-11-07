@@ -42,11 +42,10 @@ export const EvidenceEvent = memo(function EvidenceEvent({
   const t = toneClasses[tone];
   const Icon = iconFor(event);
   const decision = event.decision;
+  const Tag = onSelect ? "button" : "div";
   return (
-    <button
-      type="button"
-      onClick={() => onSelect?.(event)}
-      aria-pressed={selected}
+    <Tag
+      {...(onSelect ? { type: "button" as const, onClick: () => onSelect(event), "aria-pressed": selected } : {})}
       data-seq={event.seq}
       className={cn(
         "group grid w-full grid-cols-[44px_18px_1fr_auto] items-start gap-2 border-l-2 px-3 text-left transition-colors duration-150",
@@ -76,6 +75,6 @@ export const EvidenceEvent = memo(function EvidenceEvent({
         )}
         {!compact && <span className="hidden text-[10.5px] text-faint xl:inline">{ACTOR_LABEL[event.actor] ?? event.actor}</span>}
       </span>
-    </button>
+    </Tag>
   );
 });
