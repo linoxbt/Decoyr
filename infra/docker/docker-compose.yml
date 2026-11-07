@@ -1,0 +1,151 @@
+# Decoyr full stack for a single Vultr Cloud Compute VM.
+#
+#   cd infra/docker && cp .env.example .env && docker compose build && docker compose up -d
+#
+# Trust boundaries:
+#   * `control` network: trusted services only (api, postgres, web, caddy, mcp-city, egress-proxy).
+#   * Candidate containers are NOT defined here. The api (orchestrator) creates one internal
+#     (no-internet) network per run, starts the hardened candidate on it, and attaches
+#     `decoyr-mcp-city` to that network under the alias `mcp-city`. The candidate can reach
+#     nothing else: not the api, not postgres, not the internet.
+#   * Only the api gets the Docker socket. Candidates never do.
+name: decoyr
+
+x-common-env: &common-env
+  DECOYR_INTERNAL_SIGNING_KEY: ${DECOYR_INTERNAL_SIGNING_KEY:?set DECOYR_INTERNAL_SIGNING_KEY in .env}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: decoyr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: decoyr
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [control]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U decoyr -d decoyr"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: &logging
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  api:
+    build:
+      context: ../../apps/api
+    image: decoyr/api:latest
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      mcp-city: { condition: service_started }
+      egress-proxy: { condition: service_started }
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+psycopg://decoyr:${POSTGRES_PASSWORD}@postgres:5432/decoyr
+      VULTR_SERVERLESS_INFERENCE_API_KEY: ${VULTR_SERVERLESS_INFERENCE_API_KEY:-}
+      VULTR_INFERENCE_BASE_URL: ${VULTR_INFERENCE_BASE_URL:-https://api.vultrinference.com/v1}
+      DECOYR_MODEL: ${DECOYR_MODEL:-}
+      DECOYR_ADMIN_TOKEN: ${DECOYR_ADMIN_TOKEN:-}
+      DECOYR_PUBLIC_URL: ${DECOYR_PUBLIC_URL:-http://localhost}
+      DECOYR_HOST_PROVIDER: ${DECOYR_HOST_PROVIDER:-vultr}
+      DECOYR_SANDBOX: docker
+      DECOYR_CANDIDATE_IMAGE: decoyr/candidate-agent:latest
+      DECOYR_MCP_CONTAINER: decoyr-mcp-city
+      DECOYR_SANDBOX_MCP_URL: http://mcp-city:7100
+      DECOYR_MCP_HEALTH_URL: http://mcp-city:7100/healthz
+      DECOYR_EGRESS_HEALTH_URL: http://egress-proxy:7200/healthz
+      TRIAL_MAX_SECONDS: ${TRIAL_MAX_SECONDS:-180}
+      TRIAL_MEMORY_MB: ${TRIAL_MEMORY_MB:-512}
+      TRIAL_CPU_QUOTA: ${TRIAL_CPU_QUOTA:-1.0}
+      TRIAL_MAX_PIDS: ${TRIAL_MAX_PIDS:-128}
+      TRIAL_MAX_TOOL_CALLS: ${TRIAL_MAX_TOOL_CALLS:-40}
+    volumes:
+      # Trusted orchestrator only. Never mounted into candidate containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [control]
+    logging: *logging
+
+  mcp-city:
+    build:
+      context: ../../services/mcp-city
+    image: decoyr/mcp-city:latest
+    container_name: decoyr-mcp-city
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      PORT: "7100"
+      DECOYR_CONTROL_PLANE_URL: http://api:8000
+      DECOYR_EGRESS_URL: http://egress-proxy:7200
+    networks:
+      control:
+        aliases: [mcp-city]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  egress-proxy:
+    build:
+      context: ../../services/egress-proxy
+    image: decoyr/egress-proxy:latest
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      PORT: "7200"
+      DECOYR_CONTROL_PLANE_URL: http://api:8000
+    networks: [control]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  web:
+    build:
+      context: ../../apps/web
+    image: decoyr/web:latest
+    restart: unless-stopped
+    depends_on: [api]
+    environment:
+      DECOYR_API_URL: http://api:8000
+      NODE_ENV: production
+    networks: [control]
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [web, api]
+    environment:
+      DECOYR_DOMAIN: ${DECOYR_DOMAIN:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [control]
+    logging: *logging
+
+  # Build-only: `docker compose --profile build build candidate-agent` (or `docker compose build`
+  # with the profile enabled) produces the image the orchestrator launches per run.
+  candidate-agent:
+    profiles: ["build"]
+    build:
+      context: ../../services/candidate-agent
+    image: decoyr/candidate-agent:latest
+    network_mode: none
+    command: ["true"]
+
+networks:
+  control:
+    name: decoyr-control
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
