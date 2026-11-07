@@ -1,0 +1,8 @@
+fastapi==0.120.*
+uvicorn[standard]==0.38.*
+sqlalchemy==2.0.*
+psycopg[binary]==3.2.*
+openai>=1.100
+httpx>=0.28
+docker>=7.1
+pydantic>=2.9

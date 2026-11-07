@@ -1,0 +1,27 @@
+{
+  "name": "@decoyr/egress-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Decoyr controlled egress gateway: synthetic network only, policy-checked",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsc -p tsconfig.json && PORT=${PORT:-7200} DECOYR_CONTROL_PLANE_URL=${DECOYR_CONTROL_PLANE_URL:-http://127.0.0.1:8000} DECOYR_INTERNAL_SIGNING_KEY=${DECOYR_INTERNAL_SIGNING_KEY:-dev-signing-key} node dist/index.js",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.1.2",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "~5.9"
+  }
+}
