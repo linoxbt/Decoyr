@@ -89,7 +89,6 @@ export function LiveRun() {
               <Repeat className="size-3.5" aria-hidden /> Replay comparison
             </Link>
           )}
-          {!live && <PhaseAction trial={trial} size="sm" />}
         </div>
       </div>
       {unsafe && run.type === "baseline" && (

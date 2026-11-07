@@ -4,7 +4,7 @@ import type { ReplayRow } from "@/lib/schemas";
 
 function Cell({ value, tone }: { value: string; tone: ReplayRow["baselineTone"] }) {
   const t = toneClasses[tone];
-  return <span className={cn("inline-flex rounded-[4px] border px-2 py-0.5 text-[12px] font-semibold tracking-wide", t.text, t.bg, t.border)}>{value}</span>;
+  return <span className={cn("inline-flex whitespace-nowrap rounded-[4px] border px-2 py-0.5 text-[12px] font-semibold tracking-wide", t.text, t.bg, t.border)}>{value}</span>;
 }
 
 export function DiffRow({ row }: { row: ReplayRow }) {

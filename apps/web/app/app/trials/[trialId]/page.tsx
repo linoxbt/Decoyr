@@ -78,7 +78,7 @@ export default function TrialOverview() {
               <li key={r.id} className="py-2">
                 <Link href={r.type === "replay" ? `${base}/replay` : `${base}/run/${r.id}`} className="group flex items-center justify-between gap-2">
                   <div>
-                    <div className="text-[13px] font-medium capitalize">{r.type === "replay" ? "Guarded replay" : "Baseline"} <span className="mono text-[11.5px] font-normal text-faint">{r.id.slice(-8)}</span></div>
+                    <div className="text-[13px] font-medium">{r.type === "replay" ? "Guarded replay" : "Baseline"} <span className="mono text-[11.5px] font-normal text-faint">{r.id.slice(-8)}</span></div>
                     <div className="text-[12px] text-muted">{r.status} · {duration(r.durationMs)} · {r.toolCalls} tool calls{r.deniedCalls ? ` · ${r.deniedCalls} denied` : ""}</div>
                   </div>
                   <div className="flex flex-col items-end gap-0.5">

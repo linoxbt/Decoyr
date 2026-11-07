@@ -48,7 +48,7 @@ export const EvidenceEvent = memo(function EvidenceEvent({
       {...(onSelect ? { type: "button" as const, onClick: () => onSelect(event), "aria-pressed": selected } : {})}
       data-seq={event.seq}
       className={cn(
-        "group grid w-full grid-cols-[44px_18px_1fr_auto] items-start gap-2 border-l-2 px-3 text-left transition-colors duration-150",
+        "group grid w-full grid-cols-[56px_16px_1fr_auto] items-start gap-2 border-l-2 px-3 text-left transition-colors duration-150",
         compact ? "py-1.5" : "py-2",
         selected ? "bg-surface-2 border-l-text" : tone === "neutral" ? "border-l-transparent hover:bg-surface-2/60" : cn(t.border.replace("border-", "border-l-"), "hover:bg-surface-2/60"),
         tone === "danger" && !selected && "border-l-danger bg-danger-bg/40",

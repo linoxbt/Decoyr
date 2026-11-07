@@ -28,7 +28,7 @@ export function AuthorityMatrix({ capabilities, selected, onSelect }: { capabili
   };
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[860px] text-left text-[13px]">
+      <table className="w-full min-w-[780px] text-left text-[13px]">
         <thead className="border-b border-border text-[11.5px] uppercase tracking-[0.05em] text-faint">
           <tr>
             <th scope="col" className="px-3 py-2 font-semibold">Capability</th>

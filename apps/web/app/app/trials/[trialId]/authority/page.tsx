@@ -94,11 +94,11 @@ export default function AuthorityPage() {
         />
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_380px]">
         <Panel title="Capability matrix" subtitle="Click any cell to inspect the evidence behind it." bodyClassName="p-0">
           <AuthorityMatrix capabilities={report.capabilities} selected={sel} onSelect={setSel} />
         </Panel>
-        <div className="space-y-4">
+        <div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-1">
           <Panel title={sel ? <span className="mono">{sel.capability.name}</span> : "Evidence"} subtitle={sel ? AUTHORITY_META[sel.capability.classification].meaning : undefined}>
             {!sel ? (
               <p className="text-[13px] text-muted">Select a cell in the matrix to see why the capability was classified that way and which trace events prove it.</p>

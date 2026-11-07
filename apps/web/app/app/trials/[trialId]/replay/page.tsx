@@ -106,7 +106,7 @@ export default function ReplayPage() {
         </div>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Panel title="Baseline vs Guarded replay" bodyClassName="p-0">
           <table className="w-full">
             <thead className="border-b border-border text-[11.5px] uppercase tracking-[0.05em] text-faint">
