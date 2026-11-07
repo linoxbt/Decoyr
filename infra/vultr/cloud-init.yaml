@@ -1,0 +1,70 @@
+#cloud-config
+# Decoyr control plane VM (Ubuntu 24.04 LTS). Rendered by provision.sh:
+#   __REPO_URL__ / __REPO_REF__ / __DECOYR_DOMAIN__ are substituted before upload.
+# Secrets are generated ON the VM (never in user-data). The Vultr Serverless Inference key is
+# pushed afterwards with deploy.sh (it lives only in /opt/decoyr/infra/docker/.env, mode 600).
+package_update: true
+package_upgrade: false
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - jq
+  - openssl
+  - rsync
+
+write_files:
+  - path: /etc/docker/daemon.json
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": { "max-size": "10m", "max-file": "3" },
+        "live-restore": true,
+        "userland-proxy": false
+      }
+  - path: /usr/local/bin/decoyr-cleanup
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # Safety net for trial teardown (the orchestrator destroys run containers/networks itself).
+      set -euo pipefail
+      docker ps -aq --filter "name=decoyr-run-" --filter "status=exited" | xargs -r docker rm -f >/dev/null 2>&1 || true
+      docker ps -aq --filter "name=decoyr-run-" --filter "status=dead" | xargs -r docker rm -f >/dev/null 2>&1 || true
+      for net in $(docker network ls -q --filter "name=decoyr-run-"); do
+        # only remove networks with no candidate attached (mcp-city alone means a leaked network)
+        attached=$(docker network inspect -f '{{range .Containers}}{{.Name}} {{end}}' "$net" || true)
+        others=$(echo "$attached" | tr ' ' '\n' | grep -v -e '^$' -e '^decoyr-mcp-city$' || true)
+        if [ -z "$others" ]; then
+          docker network disconnect -f "$net" decoyr-mcp-city >/dev/null 2>&1 || true
+          docker network rm "$net" >/dev/null 2>&1 || true
+        fi
+      done
+  - path: /etc/cron.d/decoyr-cleanup
+    permissions: "0644"
+    content: |
+      */15 * * * * root /usr/local/bin/decoyr-cleanup
+
+runcmd:
+  - [bash, -c, "curl -fsSL https://get.docker.com | sh"]
+  - [systemctl, enable, --now, docker]
+  - [bash, -c, "git clone --depth 1 --branch '__REPO_REF__' '__REPO_URL__' /opt/decoyr || git clone --depth 1 '__REPO_URL__' /opt/decoyr"]
+  - - bash
+    - -c
+    - |
+      set -euo pipefail
+      cd /opt/decoyr/infra/docker
+      if [ ! -f .env ]; then
+        cp .env.example .env
+        sed -i "s|^DECOYR_INTERNAL_SIGNING_KEY=.*|DECOYR_INTERNAL_SIGNING_KEY=$(openssl rand -hex 32)|" .env
+        sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
+        sed -i "s|^DECOYR_ADMIN_TOKEN=.*|DECOYR_ADMIN_TOKEN=$(openssl rand -hex 16)|" .env
+        sed -i "s|^DECOYR_DOMAIN=.*|DECOYR_DOMAIN=__DECOYR_DOMAIN__|" .env
+        if [ "__DECOYR_DOMAIN__" != ":80" ]; then
+          sed -i "s|^DECOYR_PUBLIC_URL=.*|DECOYR_PUBLIC_URL=https://__DECOYR_DOMAIN__|" .env
+        fi
+        chmod 600 .env
+      fi
+      docker compose --profile build build
+      docker compose up -d
+final_message: "Decoyr VM ready after $UPTIME seconds"

@@ -51,6 +51,7 @@
   --radius-lg: 8px;
 }
 
+@layer base {
 * {
   border-color: var(--border);
 }
@@ -74,6 +75,9 @@ body {
   border-radius: 3px;
 }
 
+}
+
+@layer components {
 .mono {
   font-family: var(--font-mono);
   font-size: 0.92em;
@@ -86,6 +90,8 @@ body {
 .scroll-thin {
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
+}
+
 }
 
 /* Untrusted markdown rendering */

@@ -72,6 +72,7 @@ services:
   mcp-city:
     build:
       context: ../../services/mcp-city
+      secrets: [npm_ca]
     image: decoyr/mcp-city:latest
     container_name: decoyr-mcp-city
     restart: unless-stopped
@@ -91,6 +92,7 @@ services:
   egress-proxy:
     build:
       context: ../../services/egress-proxy
+      secrets: [npm_ca]
     image: decoyr/egress-proxy:latest
     restart: unless-stopped
     environment:
@@ -137,6 +139,7 @@ services:
     profiles: ["build"]
     build:
       context: ../../services/candidate-agent
+      secrets: [npm_ca]
     image: decoyr/candidate-agent:latest
     network_mode: none
     command: ["true"]
@@ -144,6 +147,11 @@ services:
 networks:
   control:
     name: decoyr-control
+
+# Optional extra CA bundle for TLS-intercepting build proxies (empty by default; not needed on Vultr).
+secrets:
+  npm_ca:
+    file: ${BUILD_CA_FILE:-./build-ca.pem}
 
 volumes:
   pgdata:

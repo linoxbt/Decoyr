@@ -4,7 +4,7 @@ FROM node:22-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=secret,id=npm_ca,required=false \
-    if [ -f /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; \
+    if [ -s /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; \
     npm ci --no-audit --no-fund
 COPY tsconfig.json ./
 COPY src ./src
@@ -14,7 +14,7 @@ FROM node:22-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=secret,id=npm_ca,required=false \
-    if [ -f /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; \
+    if [ -s /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; \
     npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 
 FROM node:22-slim

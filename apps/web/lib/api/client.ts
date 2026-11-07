@@ -32,7 +32,7 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
       else if (Array.isArray(body?.detail)) detail = body.detail.map((d: { msg?: string }) => d.msg).join("; ");
       referenceId = body?.referenceId;
     } catch {
-      /* non-JSON */
+      if (res.status >= 500) detail = `The control plane returned HTTP ${res.status}. If this persists, check that the Decoyr API is running.`;
     }
     throw new ApiError(detail, res.status, referenceId);
   }
