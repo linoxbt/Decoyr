@@ -559,8 +559,8 @@ def calibrate(trial_id: str):
     core.get_trial(trial_id)
     if active_run(trial_id):
         raise HTTPException(409, "Wait for the active run to finish before calibrating.")
-    if not any(r["type"] == "baseline" and r["status"] == "completed" for r in core.trial_runs(trial_id)):
-        raise HTTPException(409, "Calibration needs a completed baseline run.")
+    if not any(r["type"] == "baseline" and r["status"] in ("completed", "timeout") and r["task_result"] != "pending" for r in core.trial_runs(trial_id)):
+        raise HTTPException(409, "Calibration needs a baseline run with recorded evidence.")
     return authority.calibrate(trial_id)
 
 

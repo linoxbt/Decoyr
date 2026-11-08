@@ -12,7 +12,7 @@ import json
 import re
 from typing import Any
 
-from . import db, events, inference, policy, scenarios
+from . import core, db, events, inference, policy, scenarios
 from .config import settings
 from .ids import now_iso
 
@@ -69,7 +69,9 @@ def runs_of(trial: dict) -> list[dict]:
 
 
 def latest(runs: list[dict], rtype: str, completed: bool = False) -> dict | None:
-    rs = [r for r in runs if r["type"] == rtype and (not completed or r["status"] == "completed")]
+    # "completed" here means the run produced evaluated evidence (a timeout still has results).
+    ok = {"completed", "timeout"}
+    rs = [r for r in runs if r["type"] == rtype and (not completed or (r["status"] in ok and r["task_result"] != "pending"))]
     return rs[-1] if rs else None
 
 
@@ -314,9 +316,11 @@ def _fingerprint(trial: dict, agent: dict, base: dict | None, rep: dict | None, 
 def passport(trial: dict) -> dict:
     runs = runs_of(trial)
     base = latest(runs, "baseline", completed=True)
-    rep = latest(runs, "replay", completed=False)
-    rep_done = rep if rep and rep["status"] not in ACTIVE_RUN else None
     g = db.get_one(db.guards, id=trial["guard_id"]) if trial["guard_id"] else None
+    # The replay only proves the CURRENT Guard: it must have run under exactly trial.guard_id.
+    # After a recalibration to a new Guard version, the old replay no longer counts.
+    rep_done = next((r for r in reversed(runs)
+                     if r["type"] == "replay" and r["status"] not in ACTIVE_RUN and g and r.get("guard_id") == g["id"]), None)
     agent, _ = agent_label(trial)
     inf = inference.info()
     findings = [f["data"] for f in db.get_many(db.findings, order_by=[db.findings.c.created_at], trial_id=trial["id"])]
@@ -331,7 +335,10 @@ def passport(trial: dict) -> dict:
     status = "incomplete" if missing else ("calibrated" if calibrated else "not_calibrated")
     pid = "psp_" + hashlib.sha256(f"v2|{trial['id']}|{base and base['id']}|{g and g['id']}|{rep_done and rep_done['id']}".encode()).hexdigest()[:20]
 
-    if status != "incomplete":
+    # Cache a completed Passport only once the trial itself is in a final state, so a snapshot taken
+    # mid-finish (results not yet written) is never frozen and served forever.
+    final_trial = trial["status"] in core.FINAL_TRIAL_STATUSES
+    if status != "incomplete" and final_trial:
         stored = db.get_one(db.passports, id=pid)
         if stored:
             return stored["data"]
@@ -402,7 +409,7 @@ def passport(trial: dict) -> dict:
         + ["Agent name, version and purpose are declared by the developer; the fingerprint (runtime digest, prompt hash, models served) identifies what actually ran."]
         + ([] if model_in_loop or missing else ["No model calls were recorded in at least one run, so the result is not attributed to an AI agent and the Passport is not labeled calibrated."]),
     }
-    if status != "incomplete":
+    if status != "incomplete" and final_trial:
         try:
             db.insert_row(db.passports, {"id": pid, "trial_id": trial["id"], "data": data, "generated_at": data["generatedAt"]})
         except Exception:  # concurrent request already stored the same snapshot

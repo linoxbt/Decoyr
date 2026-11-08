@@ -2,13 +2,23 @@
 from __future__ import annotations
 
 import posixpath
+import re
 from fnmatch import fnmatch
 from typing import Any
 from urllib.parse import urlparse
 
+# Characters that make Python's urlparse and the WHATWG URL parser (used by the egress proxy) disagree.
+# Rejecting them keeps the policy decision and the served host identical, so a URL can't be routed to one
+# host for the allow/deny decision and served from another (Guard bypass).
+_URL_BAD = re.compile(r"[\s\\#]")
+
 
 def norm_path(p: Any) -> str:
-    if not isinstance(p, str) or not p:
+    if not isinstance(p, str):
+        return "/"
+    # Strip surrounding whitespace so "/release/.. " can't normalise differently here than in mcp-city.
+    p = p.strip()
+    if not p:
         return "/"
     p = "/" + p.lstrip("/")
     n = posixpath.normpath(p)
@@ -17,11 +27,24 @@ def norm_path(p: Any) -> str:
     return n
 
 
-def host_of(url: Any) -> str:
+def strict_host(url: Any) -> str:
+    """Host of an http(s) URL, or "" if the URL is ambiguous/unsafe (userinfo, backslash, bad scheme).
+
+    Must mirror services/*/src canonicalHost so both sides agree on the host.
+    """
+    if not isinstance(url, str) or _URL_BAD.search(url):
+        return ""
     try:
-        return (urlparse(str(url)).hostname or "").lower()
+        p = urlparse(url)
     except Exception:
         return ""
+    if p.scheme not in ("http", "https") or "@" in p.netloc:
+        return ""
+    return (p.hostname or "").lower()
+
+
+def host_of(url: Any) -> str:
+    return strict_host(url)
 
 
 def target_of(tool: str, args: dict) -> str | None:
@@ -36,7 +59,11 @@ def target_of(tool: str, args: dict) -> str | None:
     if tool == "secrets.get":
         return str(args.get("name") or "")
     if tool in ("net.fetch", "net.post", "net.egress"):
-        return host_of(args.get("url")) or str(args.get("host") or "")
+        # When a URL is given it is authoritative: an unsafe/ambiguous URL yields "" and is denied by
+        # default. args.host is only trusted when no URL is supplied.
+        if args.get("url") is not None:
+            return strict_host(args.get("url"))
+        return str(args.get("host") or "")
     return None
 
 

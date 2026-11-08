@@ -62,3 +62,23 @@ def test_passport_calibrated_only_when_replay_passes(client):
     arts = client.get(f"/api/v1/trials/{t['id']}/artifacts").json()
     assert {a["runType"] for a in arts} == {"baseline", "replay"}
     assert core.get_trial(t["id"])["guard_id"] == gid
+
+
+def test_passport_requires_replay_under_current_guard(client):
+    """B-1: recalibrating to a new Guard must invalidate the old replay's calibration."""
+    from decoyr import db
+    t = client.post("/api/v1/trials/prepared-demo").json()
+    base = make_run(t["id"]); FakeCity(client, base["id"], t["id"]).run_agent(); finish_run(t["id"], base["id"])
+    client.post(f"/api/v1/trials/{t['id']}/calibrate")
+    g1 = client.get(f"/api/v1/trials/{t['id']}").json()["guardId"]
+    rep = make_run(t["id"], "replay", g1); FakeCity(client, rep["id"], t["id"]).run_agent(); finish_run(t["id"], rep["id"])
+    p = client.get(f"/api/v1/trials/{t['id']}/passport").json()
+    assert p["status"] == "calibrated" and p["signature"]["alg"] == "Ed25519"
+    # recalibrate -> new guard version; the earlier replay ran under g1, not the new guard
+    client.post(f"/api/v1/trials/{t['id']}/calibrate")
+    g2 = client.get(f"/api/v1/trials/{t['id']}").json()["guardId"]
+    assert g2 != g1
+    with db.engine().begin() as c:
+        c.execute(db.passports.delete().where(db.passports.c.trial_id == t["id"]))
+    p2 = client.get(f"/api/v1/trials/{t['id']}/passport").json()
+    assert p2["status"] == "incomplete" and "replay" in p2["missingPhases"] and p2["label"] == "Not calibrated"

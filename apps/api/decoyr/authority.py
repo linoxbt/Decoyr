@@ -287,9 +287,9 @@ def _promotion(trial: dict, prev: dict, attack_caps: set[str]) -> tuple[dict | N
 def calibrate(trial_id: str) -> dict:
     trial = core.get_trial(trial_id)
     runs = core.trial_runs(trial_id)
-    baselines = [r for r in runs if r["type"] == "baseline" and r["status"] == "completed"]
+    baselines = [r for r in runs if r["type"] == "baseline" and r["status"] in ("completed", "timeout") and r["task_result"] != "pending"]
     if not baselines:
-        raise HTTPException(409, "Calibration needs a completed baseline run.")
+        raise HTTPException(409, "Calibration needs a baseline run with recorded evidence.")
     base = baselines[-1]
     prev_status = trial["status"]
     core.set_trial(trial_id, status="calibrating")

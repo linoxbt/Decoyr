@@ -1,8 +1,14 @@
 /** Synthetic network resolution. Never performs real network I/O. */
 export function parseUrl(url) {
+    // Reject characters that make parsers disagree, and URLs with userinfo, so the host used here is
+    // identical to the one the control plane's policy saw.
+    if (typeof url !== "string" || /[\s\\#]/.test(url))
+        return null;
     try {
         const u = new URL(url);
         if (u.protocol !== "http:" && u.protocol !== "https:")
+            return null;
+        if (u.username || u.password)
             return null;
         return { host: u.hostname.toLowerCase(), path: (u.pathname || "/") + (u.search || "") };
     }

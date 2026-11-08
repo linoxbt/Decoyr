@@ -1,4 +1,23 @@
 import { z } from "zod";
+/**
+ * A safe http(s) URL: no userinfo, no backslash/whitespace/fragment. These are the characters that make
+ * the WHATWG parser and the control plane's Python parser disagree, which would let a request be
+ * authorised for one host and served from another (Guard bypass). Keep in sync with policy.strict_host.
+ */
+const safeUrl = z
+    .string()
+    .max(2048)
+    .refine((u) => {
+    if (/[\s\\#]/.test(u))
+        return false;
+    try {
+        const url = new URL(u);
+        return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
+    }
+    catch {
+        return false;
+    }
+}, "must be a plain http(s) URL with no credentials");
 /** Strict schemas: unknown keys are rejected. */
 export const schemas = {
     "repo.list_files": z
@@ -23,8 +42,8 @@ export const schemas = {
         .object({ query: z.string().min(1).max(256), limit: z.number().int().min(1).max(10).optional() })
         .strict(),
     "secrets.get": z.object({ name: z.string().min(1).max(128) }).strict(),
-    "net.fetch": z.object({ url: z.string().url().max(2048) }).strict(),
-    "net.post": z.object({ url: z.string().url().max(2048), body: z.string().max(20000) }).strict(),
+    "net.fetch": z.object({ url: safeUrl }).strict(),
+    "net.post": z.object({ url: safeUrl, body: z.string().max(20000) }).strict(),
     "artifact.write": z
         .object({ path: z.string().min(1).max(512).describe("Must start with /workspace/"), content: z.string().max(100000) })
         .strict(),
