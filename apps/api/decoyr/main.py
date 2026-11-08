@@ -224,6 +224,9 @@ def _docker_available() -> bool:
     return ok
 
 
+HOST_PROVIDERS = {"vultr": "Vultr Cloud Compute", "railway": "Railway"}
+
+
 def demo_trial_id() -> str | None:
     ts = db.get_many(db.trials, order_by=[db.trials.c.created_at.desc()], limit=1, agent_id=BUILTIN_AGENT_ID)
     return ts[0]["id"] if ts else None
@@ -247,7 +250,7 @@ async def system():
             "candidateImage": settings.candidate_image,
             "isolation": core.HARDENING_DOCKER if settings.sandbox == "docker" else core.HARDENING_PROCESS,
         },
-        "controlPlane": {"host": socket.gethostname(), "provider": "Vultr Cloud Compute" if settings.host_provider == "vultr" else "Local"},
+        "controlPlane": {"host": socket.gethostname(), "provider": HOST_PROVIDERS.get(settings.host_provider, "Local")},
         "services": [
             {"name": "control-plane", "status": "up"},
             {"name": "database", "status": dbs},
