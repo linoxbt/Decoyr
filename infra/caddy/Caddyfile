@@ -1,5 +1,6 @@
 # DECOYR_DOMAIN: a hostname (automatic HTTPS via Let's Encrypt) or ":80" for plain HTTP.
-{$DECOYR_DOMAIN::80} {
+# Shared site definition, imported by every site address below.
+(decoyr) {
 	encode zstd gzip
 
 	# Control plane API + SSE live trace (no buffering).
@@ -39,3 +40,11 @@
 		format console
 	}
 }
+
+# Primary site: DECOYR_DOMAIN from .env (a hostname for automatic HTTPS, or ":80" for plain HTTP).
+{$DECOYR_DOMAIN::80} {
+	import decoyr
+}
+
+# Extra site addresses for a specific deployment (e.g. an sslip.io hostname for HTTPS on a bare IP).
+import /etc/caddy/sites.d/*.caddy
