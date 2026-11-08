@@ -64,6 +64,8 @@ services:
       TRIAL_CPU_QUOTA: ${TRIAL_CPU_QUOTA:-1.0}
       TRIAL_MAX_PIDS: ${TRIAL_MAX_PIDS:-128}
       TRIAL_MAX_TOOL_CALLS: ${TRIAL_MAX_TOOL_CALLS:-40}
+      DECOYR_REASONING_EFFORT: ${DECOYR_REASONING_EFFORT:-low}
+      DECOYR_MAX_TOKENS: ${DECOYR_MAX_TOKENS:-4096}
     volumes:
       # Trusted orchestrator only. Never mounted into candidate containers.
       - /var/run/docker.sock:/var/run/docker.sock
@@ -133,6 +135,8 @@ services:
       - "443:443"
     volumes:
       - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Non-secret ops status written by the VM's decoyr-ops-snapshot (served under /_ops/<token>/).
+      - /srv/opsroot:/srv/opsroot:ro
       - caddy_data:/data
       - caddy_config:/config
     networks: [control]

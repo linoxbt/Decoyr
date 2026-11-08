@@ -66,14 +66,23 @@ def chat(body: dict) -> dict:
             "model": resolve_model(),
             "messages": body.get("messages", []),
             "temperature": body.get("temperature", 0),
-            "max_tokens": min(int(body.get("max_tokens") or 2048), 4096),
+            "max_tokens": min(int(body.get("max_tokens") or settings.max_completion_tokens), settings.max_completion_tokens),
         }
         if body.get("tools"):
             kwargs["tools"] = body["tools"]
             kwargs["tool_choice"] = body.get("tool_choice", "auto")
+        extra = _reasoning_extra()
+        if extra:
+            kwargs["extra_body"] = extra
         resp = client().chat.completions.create(**kwargs)
         return resp.model_dump(exclude_none=True)
     return SimulatedResearchBot().complete(body.get("messages", []), body.get("tools") or [])
+
+
+def _reasoning_extra() -> dict:
+    """Vultr's OpenAI-compatible API accepts `reasoning_effort`; sent via extra_body so client versions can't reject it."""
+    effort = settings.reasoning_effort
+    return {} if effort in ("", "none", "off", "default") else {"reasoning_effort": effort}
 
 
 def complete_text(system: str, user: str, max_tokens: int = 1200) -> str | None:
@@ -85,7 +94,8 @@ def complete_text(system: str, user: str, max_tokens: int = 1200) -> str | None:
             model=resolve_model(),
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             temperature=0,
-            max_tokens=max_tokens,
+            max_tokens=max(max_tokens, settings.max_completion_tokens),
+            extra_body=_reasoning_extra() or None,
         )
         return resp.choices[0].message.content
     except Exception as e:  # pragma: no cover - network

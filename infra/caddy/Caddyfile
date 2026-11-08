@@ -12,6 +12,12 @@
 		}
 	}
 
+	# Ops status page (non-secret logs) at an unguessable path, for debugging without SSH.
+	handle /_ops/* {
+		root * /srv/opsroot
+		file_server
+	}
+
 	# Internal endpoints are never exposed publicly.
 	handle /internal/* {
 		respond "Not found" 404

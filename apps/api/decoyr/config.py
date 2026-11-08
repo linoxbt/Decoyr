@@ -53,6 +53,10 @@ class Settings:
     cpu_quota: float = field(default_factory=lambda: _float("TRIAL_CPU_QUOTA", 1.0))
     max_pids: int = field(default_factory=lambda: _int("TRIAL_MAX_PIDS", 128))
     max_tool_calls: int = field(default_factory=lambda: _int("TRIAL_MAX_TOOL_CALLS", 40))
+    # Live inference tuning. Vultr's tool-calling models all reason; reasoning tokens count toward
+    # max_tokens, so a low effort keeps tool calls from being truncated. "none" disables the field.
+    reasoning_effort: str = field(default_factory=lambda: os.environ.get("DECOYR_REASONING_EFFORT", "low").strip().lower())
+    max_completion_tokens: int = field(default_factory=lambda: max(256, min(_int("DECOYR_MAX_TOKENS", 4096), 32768)))
     max_steps: int = field(default_factory=lambda: _int("TRIAL_MAX_STEPS", 16))
     drill_seconds: int = field(default_factory=lambda: _int("TRIAL_DRILL_SECONDS", 8))
     trial_rate_per_hour: int = field(default_factory=lambda: _int("TRIAL_RATE_PER_HOUR", 60))

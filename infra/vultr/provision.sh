@@ -3,8 +3,11 @@
 #
 # Required env:
 #   VULTR_API_KEY      Vultr account API key (used only on your machine; never sent to the VM)
-#   ADMIN_CIDR         CIDR allowed to SSH, e.g. 203.0.113.7/32
 # Optional env:
+#   ADMIN_CIDR         CIDR allowed to SSH, e.g. 203.0.113.7/32 (omit: port 22 stays closed)
+#   VULTR_SERVERLESS_INFERENCE_API_KEY  passed to the VM in a 0600 bootstrap file (see cloud-init.yaml)
+#   DECOYR_MODEL       live model id (e.g. glm-5.3-flash)
+#   DECOYR_OPS_TOKEN   secret path for the /_ops/<token>/ status page (default: random)
 #   VULTR_REGION       default: ewr
 #   VULTR_PLAN         default: vc2-4c-8gb   (4 vCPU / 8 GB)
 #   VULTR_SSH_KEY_ID   id of an SSH key already uploaded to Vultr (recommended)
@@ -16,7 +19,6 @@ set -euo pipefail
 
 API="https://api.vultr.com/v2"
 : "${VULTR_API_KEY:?VULTR_API_KEY is required}"
-: "${ADMIN_CIDR:?ADMIN_CIDR is required (e.g. 203.0.113.7/32)}"
 REGION="${VULTR_REGION:-ewr}"
 PLAN="${VULTR_PLAN:-vc2-4c-8gb}"
 REPO_URL="${REPO_URL:-https://github.com/linoxbt/Decoyr.git}"
@@ -51,11 +53,19 @@ add_rule() {
 }
 add_rule 0.0.0.0 0 80 "http"
 add_rule 0.0.0.0 0 443 "https"
-add_rule "${ADMIN_CIDR%/*}" "${ADMIN_CIDR#*/}" 22 "ssh-admin"
-echo "    rules: 80/443 public, 22 from $ADMIN_CIDR"
+if [ -n "${ADMIN_CIDR:-}" ]; then
+  add_rule "${ADMIN_CIDR%/*}" "${ADMIN_CIDR#*/}" 22 "ssh-admin"
+  echo "    rules: 80/443 public, 22 from $ADMIN_CIDR"
+else
+  echo "    rules: 80/443 public, 22 closed (no ADMIN_CIDR)"
+fi
 
 echo "==> Rendering cloud-init"
-USER_DATA="$(sed -e "s|__REPO_URL__|$REPO_URL|g" -e "s|__REPO_REF__|$REPO_REF|g" -e "s|__DECOYR_DOMAIN__|$DOMAIN|g" "$HERE/cloud-init.yaml" | base64 | tr -d '\n')"
+OPS_TOKEN="${DECOYR_OPS_TOKEN:-$(openssl rand -hex 16)}"
+BOOTSTRAP_B64="$(printf 'VULTR_SERVERLESS_INFERENCE_API_KEY=%s\nDECOYR_MODEL=%s\nDECOYR_OPS_TOKEN=%s\n' \
+  "${VULTR_SERVERLESS_INFERENCE_API_KEY:-}" "${DECOYR_MODEL:-}" "$OPS_TOKEN" | base64 | tr -d '\n')"
+USER_DATA="$(sed -e "s|__REPO_URL__|$REPO_URL|g" -e "s|__REPO_REF__|$REPO_REF|g" -e "s|__DECOYR_DOMAIN__|$DOMAIN|g" \
+  -e "s|__BOOTSTRAP_B64__|$BOOTSTRAP_B64|g" "$HERE/cloud-init.yaml" | base64 | tr -d '\n')"
 
 echo "==> Creating instance ($PLAN in $REGION)"
 BODY="$(jq -nc \
@@ -86,8 +96,8 @@ Decoyr VM provisioned.
   firewall    : $FW_ID
 
 cloud-init installs Docker, clones $REPO_URL ($REPO_REF) into /opt/decoyr and starts the stack
-(~5-10 min). Watch progress:   ssh root@$IP 'tail -f /var/log/cloud-init-output.log'
-
-Then push your Vultr Serverless Inference key and redeploy:
-  VM_HOST=$IP ./deploy.sh
+(~5-10 min). Progress and logs (no SSH needed):
+  http://$IP/_ops/$OPS_TOKEN/
+The VM pulls $REPO_REF every 2 minutes and redeploys when it changes.
+App:  http://$IP/
 MSG
