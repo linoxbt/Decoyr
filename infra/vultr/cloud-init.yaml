@@ -65,6 +65,9 @@ runcmd:
         fi
         chmod 600 .env
       fi
+      # the non-root api joins the Docker socket's group (re-detected on every boot of this script)
+      sed -i "s|^DOCKER_GID=.*|DOCKER_GID=$(stat -c %g /var/run/docker.sock)|" .env
+      grep -q '^DOCKER_GID=' .env || echo "DOCKER_GID=$(stat -c %g /var/run/docker.sock)" >> .env
       docker compose --profile build build
       docker compose up -d
 final_message: "Decoyr VM ready after $UPTIME seconds"

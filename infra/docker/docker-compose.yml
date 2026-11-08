@@ -67,6 +67,10 @@ services:
     volumes:
       # Trusted orchestrator only. Never mounted into candidate containers.
       - /var/run/docker.sock:/var/run/docker.sock
+    # The api runs as uid 10002 (non-root); this grants it the socket's group. Find it with:
+    #   stat -c %g /var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:?set DOCKER_GID in .env (stat -c %g /var/run/docker.sock)}"
     networks: [control]
     logging: *logging
 

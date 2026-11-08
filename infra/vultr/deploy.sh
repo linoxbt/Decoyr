@@ -43,7 +43,7 @@ if [ -f "$LOCAL_ENV" ]; then
 fi
 
 echo "==> build + restart"
-"${SSH[@]}" "cd '$REMOTE_DIR/infra/docker' && docker compose --profile build build && docker compose up -d --remove-orphans && docker compose ps"
+"${SSH[@]}" "cd '$REMOTE_DIR/infra/docker' && g=\$(stat -c %g /var/run/docker.sock) && { grep -q '^DOCKER_GID=' .env && sed -i \"s|^DOCKER_GID=.*|DOCKER_GID=\$g|\" .env || echo \"DOCKER_GID=\$g\" >> .env; } && docker compose --profile build build && docker compose up -d --remove-orphans && docker compose ps"
 
 echo "==> smoke test"
 "${SSH[@]}" "curl -fsS http://localhost/api/v1/health && echo"

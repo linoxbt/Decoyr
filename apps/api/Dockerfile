@@ -9,8 +9,12 @@ COPY apps/api/requirements.txt ./
 RUN pip install -r requirements.txt
 COPY packages/scenarios /srv/decoyr/packages/scenarios
 COPY apps/api/decoyr ./decoyr
-# Runs as root because the trusted orchestrator drives the host Docker socket to create candidate
-# sandboxes. Candidates never get this socket, these credentials, or this network.
+# Non-root. The orchestrator reaches the host Docker socket through supplementary group membership:
+# compose adds the socket's group id (DOCKER_GID) with `group_add`. Candidates never get this socket,
+# these credentials, or this network.
+RUN groupadd --system --gid 10002 decoyr-api \
+    && useradd --system --uid 10002 --gid 10002 --no-create-home --shell /usr/sbin/nologin decoyr-api
+USER 10002:10002
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=3s --retries=5 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=2)"
