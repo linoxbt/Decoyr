@@ -127,6 +127,8 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    # --watch reloads the Caddyfile (and sites.d/) when the VM's git sync updates them.
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile", "--watch"]
     depends_on: [web, api]
     environment:
       DECOYR_DOMAIN: ${DECOYR_DOMAIN:-:80}
@@ -134,7 +136,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../caddy:/etc/caddy:ro
       # Non-secret ops status written by the VM's decoyr-ops-snapshot (served under /_ops/<token>/).
       - /srv/opsroot:/srv/opsroot:ro
       - caddy_data:/data
