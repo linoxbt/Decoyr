@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://decoyr.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://108-61-245-158.sslip.io"),
   title: { default: "Decoyr — Agent Trust Calibration", template: "%s · Decoyr" },
   openGraph: { type: "website", siteName: "Decoyr", title: "Decoyr — Agent Trust Calibration", description: "Give your AI agent a fake company before you give it yours." },
   twitter: { card: "summary", title: "Decoyr — Agent Trust Calibration", description: "Give your AI agent a fake company before you give it yours." },
