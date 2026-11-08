@@ -123,7 +123,9 @@ export function useReplay(id: string, active?: boolean) {
   return useQuery({
     queryKey: qk.replay(id),
     queryFn: () => api<ReplayComparison>(`/trials/${id}/replay`),
-    refetchInterval: active ? 2500 : false,
+    // Keep polling while the cached comparison still says "running": the trial poll can observe the
+    // finished status before the SSE `end` event, which would otherwise leave a stale comparison on screen.
+    refetchInterval: (q) => (active || q.state.data?.status === "running" ? 2500 : false),
   });
 }
 
