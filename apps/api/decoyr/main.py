@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import authority, core, db, events, inference, orchestrator, policy, scenarios, signing, tokens
+from . import authority, core, db, events, inference, limits, orchestrator, policy, scenarios, signing, tokens
 from .config import settings
 from .ids import new_id, now_iso
 
@@ -54,6 +54,7 @@ BUILTIN_AGENT_ID = "agt_researchbot"
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    settings.check_startup()
     db.engine()
     core.ensure_builtin_agents()
     try:
@@ -384,6 +385,26 @@ def _check_rate() -> None:
         raise HTTPException(429, f"Trial rate limit reached ({settings.trial_rate_per_hour} per hour). Try again later.")
 
 
+def require_api_key(x_decoyr_key: str | None = Header(default=None)) -> None:
+    """Require a configured X-Decoyr-Key on mutating routes. No keys configured = open public demo."""
+    keys = settings.api_keys
+    if not keys:
+        return
+    supplied = x_decoyr_key or ""
+    if not any(hmac.compare_digest(supplied, k) for k in keys):
+        raise HTTPException(401, "invalid or missing X-Decoyr-Key")
+
+
+def gate_action(request: Request, _k: None = Depends(require_api_key)) -> None:
+    """Per-client limit for mutating actions (create/duplicate/calibrate)."""
+    limits.rate_limit(request, "action", settings.ip_actions_per_10min)
+
+
+def gate_run(request: Request, _k: None = Depends(require_api_key)) -> None:
+    """Stricter per-client limit for the expensive run/replay routes (containers + model calls)."""
+    limits.rate_limit(request, "run", settings.ip_runs_per_10min)
+
+
 _WORLD_RE = __import__("re").compile(r"^[a-z0-9][a-z0-9.-]{0,60}$")
 
 
@@ -392,7 +413,7 @@ def _known_world(version: str) -> None:
         raise HTTPException(400, f"unknown world version {version}")
 
 
-@app.post(f"{P}/trials")
+@app.post(f"{P}/trials", dependencies=[Depends(gate_action)])
 def create_trial(body: CreateTrialRequest):
     _check_rate()
     _known_world(body.worldVersion)
@@ -409,7 +430,7 @@ def _prepared_demo() -> dict:
     return core.create_trial(agent, "acme-labs-v1", m["task"]["id"], ["indirect-injection-v1"])
 
 
-@app.post(f"{P}/trials/prepared-demo")
+@app.post(f"{P}/trials/prepared-demo", dependencies=[Depends(gate_action)])
 def prepared_demo():
     _check_rate()
     return core.trial_to_api(_prepared_demo())
@@ -420,7 +441,7 @@ def get_trial(trial_id: str):
     return core.trial_to_api(core.get_trial(trial_id))
 
 
-@app.post(f"{P}/trials/{{trial_id}}/duplicate")
+@app.post(f"{P}/trials/{{trial_id}}/duplicate", dependencies=[Depends(gate_action)])
 def duplicate_trial(trial_id: str):
     _check_rate()
     t = core.get_trial(trial_id)
@@ -545,7 +566,7 @@ def get_world(trial_id: str, inspect: bool = False):
 
 # ----- Runs --------------------------------------------------------------------
 
-@app.post(f"{P}/trials/{{trial_id}}/run")
+@app.post(f"{P}/trials/{{trial_id}}/run", dependencies=[Depends(gate_run)])
 def start_baseline(trial_id: str):
     core.get_trial(trial_id)
     if active_run(trial_id):
@@ -596,7 +617,7 @@ def list_findings(trial_id: str):
 
 # ----- Authority / Guard / Replay / Passport ----------------------------------
 
-@app.post(f"{P}/trials/{{trial_id}}/calibrate")
+@app.post(f"{P}/trials/{{trial_id}}/calibrate", dependencies=[Depends(gate_action)])
 def calibrate(trial_id: str):
     core.get_trial(trial_id)
     if active_run(trial_id):
@@ -621,7 +642,7 @@ def get_guard(trial_id: str):
     return _reports().guard_to_api(g)
 
 
-@app.post(f"{P}/trials/{{trial_id}}/replay")
+@app.post(f"{P}/trials/{{trial_id}}/replay", dependencies=[Depends(gate_run)])
 def start_replay(trial_id: str):
     t = core.get_trial(trial_id)
     if not t["guard_id"]:
@@ -985,6 +1006,10 @@ async def internal_inference(request: Request, x_decoyr_trial_token: str | None 
     budget = settings.max_steps + 2
     if (run["model_calls"] or 0) >= budget:
         raise HTTPException(429, f"model call budget exhausted ({budget} calls per run)")
+    # Global per-day ceiling on real (billed) model calls, so back-to-back runs on the public demo
+    # can't drain the operator's inference bill. Simulated inference is free, so it is never counted.
+    if settings.inference_mode == "vultr" and not limits.reserve_model_call():
+        raise HTTPException(429, "daily model-call budget exhausted for this deployment; try again tomorrow")
     return await run_in_threadpool(_do_inference, run, trial, body)
 
 

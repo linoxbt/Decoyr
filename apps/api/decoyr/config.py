@@ -68,11 +68,37 @@ class Settings:
     max_steps: int = field(default_factory=lambda: _int("TRIAL_MAX_STEPS", 16))
     drill_seconds: int = field(default_factory=lambda: _int("TRIAL_DRILL_SECONDS", 8))
     trial_rate_per_hour: int = field(default_factory=lambda: _int("TRIAL_RATE_PER_HOUR", 60))
+    # Per-client abuse limits for the public demo (0 disables; enforced in-process, so the api must
+    # run a single worker — see apps/api/Dockerfile). Keyed by client IP (X-Forwarded-For from Caddy).
+    ip_actions_per_10min: int = field(default_factory=lambda: max(0, _int("DECOYR_IP_ACTIONS_PER_10MIN", 30)))
+    ip_runs_per_10min: int = field(default_factory=lambda: max(0, _int("DECOYR_IP_RUNS_PER_10MIN", 8)))
+    # Global ceiling on real model calls per UTC day across all runs (0 disables). Guards the operator's
+    # inference bill when the demo is public: the per-run budget alone can't bound back-to-back runs.
+    daily_model_calls: int = field(default_factory=lambda: max(0, _int("DECOYR_DAILY_MODEL_CALLS", 3000)))
+    # Optional shared secrets required on mutating routes (X-Decoyr-Key). Empty = open public demo.
+    api_keys_csv: str = field(default_factory=lambda: os.environ.get("DECOYR_API_KEYS", ""))
     scenarios_dir: Path = REPO_ROOT / "packages/scenarios"
+
+    @property
+    def api_keys(self) -> list[str]:
+        return [k.strip() for k in self.api_keys_csv.split(",") if k.strip()]
 
     @property
     def inference_mode(self) -> str:
         return "vultr" if self.vultr_key else "simulated"
+
+    def check_startup(self) -> None:
+        """Refuse to start a real deployment with the insecure dev signing key.
+
+        The key signs service and sandbox trial tokens; the dev default is public. Local dev and
+        the test suite (host_provider == "local") are exempt. On the VM, cloud-init generates a
+        fresh key, so this only fires on a genuine misconfiguration.
+        """
+        if self.host_provider != "local" and self.signing_key in ("", "dev-signing-key"):
+            raise RuntimeError(
+                "DECOYR_INTERNAL_SIGNING_KEY is unset or the insecure dev default on a non-local "
+                "deployment (DECOYR_HOST_PROVIDER=%s). Set a strong random key." % self.host_provider
+            )
 
 
 settings = Settings()
