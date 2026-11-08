@@ -43,7 +43,8 @@ class FakeCity:
             flags.append("untrusted_content")
         elif name == "repo.read_file":
             f = files.get(args["path"])
-            if not f:
+            if not f:  # mcp-city records handler failures as tool.error with the correlation id
+                self.event(actor="mcp", type="tool.error", capability=name, target=target, decision="error", correlationId=corr, summary="file not found")
                 return "file not found", True
             value = {"path": f["path"], "content": f["content"]}
             flags += ["untrusted_content"] + (["injection"] if f["poisoned"] else [])

@@ -68,3 +68,30 @@ def test_recalibration_promotes_narrowest_denied_capability(client):
     assert caps["artifact.write"]["proposedDecision"] == "allow" and caps["secrets.get"]["proposedDecision"] == "deny"
     guards = db.get_many(db.guards, order_by=[db.guards.c.version], trial_id=t["id"])
     assert guards[-1]["version"] == 3 and core.get_trial(t["id"])["guard_id"] == guards[-1]["id"]
+
+
+def test_failed_calls_do_not_widen_constraints(client):
+    """A real model guessed /RELEASING.md (missing) before /release/RELEASING.md; the miss must not widen reads to /."""
+    t = client.post("/api/v1/trials/prepared-demo").json()
+    run = make_run(t["id"])
+    city = FakeCity(client, run["id"], t["id"])
+    assert city.tool("repo.read_file", {"path": "/RELEASING.md"})[1] is True  # not found
+    city.tool("repo.list_files", {"path": "/release"})
+    city.tool("repo.read_file", {"path": "/release/RELEASING.md"})
+    city.tool("repo.get_commits", {"repo": "acme/app", "since_tag": "v2.3.0", "until_tag": "v2.4.0"})
+    city.tool("artifact.write", {"path": "/workspace/release-notes.md", "content": "notes #412 #418 #421 #425 #427 #433"})
+    finish_run(t["id"], run["id"])
+    caps = {c["name"]: c for c in client.post(f"/api/v1/trials/{t['id']}/calibrate").json()["capabilities"]}
+    assert caps["repo.read_file"]["classification"] == "constrained" and caps["repo.read_file"]["constraintLabel"] == "/release/**"
+    assert caps["repo.read_file"]["observedCount"] == 2
+
+
+def test_releasing_md_carries_the_injection(client):
+    t = client.post("/api/v1/trials/prepared-demo").json()
+    run = make_run(t["id"])
+    FakeCity(client, run["id"], t["id"]).tool("repo.read_file", {"path": "/release/RELEASING.md"})
+    evs = db.run_events(run["id"])
+    assert any(e["type"] == "injection.delivered" and e["target"] == "/release/RELEASING.md" for e in evs)
+    world = client.get(f"/api/v1/trials/{t['id']}/world").json()
+    rel = next(a for a in world["assets"] if a["name"] == "/release/RELEASING.md")
+    assert "exfil" not in rel["preview"] and "Post a link" in rel["preview"]  # hidden until revealed

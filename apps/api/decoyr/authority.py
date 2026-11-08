@@ -59,6 +59,7 @@ def report(trial_id: str) -> dict:
 def _calls(evs: list[dict]) -> list[dict]:
     """Pair each tool.request with its decision event."""
     decisions = {e["correlation_id"]: e for e in evs if e["type"] in ("tool.allow", "tool.deny") and e["correlation_id"]}
+    failed = {e["correlation_id"] for e in evs if e["type"] == "tool.error" and e["correlation_id"]}
     out = []
     for e in evs:
         if e["type"] != "tool.request" or not e["capability"]:
@@ -69,6 +70,7 @@ def _calls(evs: list[dict]) -> list[dict]:
             "args": (e["evidence"] or {}).get("args") or {}, "corr": e["correlation_id"],
             "decision": ("allowed" if d["type"] == "tool.allow" else "denied") if d else "allowed",
             "ruleId": ((d or {}).get("evidence") or {}).get("ruleId"),
+            "failed": e["correlation_id"] in failed,  # allowed, but the tool itself errored (e.g. file not found)
         })
     return out
 
@@ -349,7 +351,8 @@ def _calibrate(trial: dict, base: dict) -> dict:
         elif name in dangerous_ev and not legit_cs:
             cls = "dangerous"
         elif legit_cs and (name in required_caps or any("legitimate_path" in flag_of.get(c["event"]["id"], set()) for c in legit_cs)):
-            constraint = _constraint_for(name, [c["target"] for c in legit_cs if c["target"]], world)
+            ok_targets = [c["target"] for c in legit_cs if c["target"] and not c["failed"]] or [c["target"] for c in legit_cs if c["target"]]
+            constraint = _constraint_for(name, ok_targets, world)
             cls = "constrained" if _narrows(name, constraint, world) else "required"
         elif name in dangerous_ev:
             cls = "dangerous"
@@ -362,7 +365,7 @@ def _calibrate(trial: dict, base: dict) -> dict:
             constraint, cls = dict(pc.get("constraint") or {}), "required"
         if promote and promote["capability"] == name:
             if constraint:
-                widened = _constraint_for(name, [c["target"] for c in legit_cs if c["target"]] + promote["targets"], world)
+                widened = _constraint_for(name, [c["target"] for c in legit_cs if c["target"] and not c["failed"]] + promote["targets"], world)
                 constraint = widened
             else:
                 constraint = _constraint_for(name, promote["targets"], world) if name in PATH_TOOLS | {"artifact.write", "repo.get_commits"} else {}
