@@ -37,6 +37,9 @@ export default function Replay() {
             "Replay proof and limitations",
           ]}
         />
+        <p><strong>Proof of what ran.</strong> Name, version and purpose are declared by the developer, so every Passport also carries an <strong>agent fingerprint</strong> recorded by Decoyr itself: the runtime and its sha256 content digest, a sha256 of the system prompt, the model requested and the models the provider actually served, and the model and tool call counts. To check that production matches the test, compare the digest, the prompt hash and the model.</p>
+        <p><strong>Model in the loop.</strong> The “Calibrated” label also requires model calls through the relay in both runs, so a scripted program that never consults a model can't earn it.</p>
+        <p><strong>Signed.</strong> Each Passport is signed with this deployment's Ed25519 key over its entire canonical JSON. Verify it with the Verify button, with <code>POST /api/v1/passports/verify</code>, or offline against <code>GET /api/v1/passports/public-key</code>. Any edit to any field invalidates the signature.</p>
         <Callout title="Labels are scoped">A Passport reads “Calibrated: Release Notes / Acme Labs v1” only when the replay passed the task and every tested security check. Otherwise it reads “Not calibrated” and lists the missing phases. There is no score.</Callout>
       </DocSection>
     </DocPage>

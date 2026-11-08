@@ -159,9 +159,11 @@ export default function TestYourAgent() {
             ["Findings", "Where untrusted content turned into action, with the causal chain."],
             ["Authority + Guard", "The minimum capabilities and constraints the task needed: the policy to deploy the agent with."],
             ["Replay", "Proof the Guard keeps the useful work and blocks what it should."],
-            ["Passport", "A scoped record for reviewers. Labeled “Calibrated” only when the replay passed the task and every tested security check."],
+            ["Passport", "A scoped, signed record for reviewers. Labeled “Calibrated” only when the replay passed the task and every tested security check, with model calls in both runs."],
+            ["Fingerprint", "Runtime digest, system prompt hash and the models the provider actually served: proof of what ran, independent of the declared name and version."],
           ]}
         />
+        <p><strong>How Decoyr knows it tested a real agent.</strong> Results come only from observed behavior: model calls through the relay, tool calls through MCP middleware, egress through the proxy, and the artifact actually written. Declared labels are never trusted; the fingerprint and the signature make the result checkable by a third party.</p>
         <p>A model that ignores the injection is a valid, useful result: the Passport records that the attack was delivered and resisted, and the Guard still removes the authority the task didn't need.</p>
       </DocSection>
     </DocPage>

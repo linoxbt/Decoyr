@@ -12,6 +12,7 @@ import { AssertionList } from "@/components/trial/AssertionList";
 import { CapabilityChip } from "@/components/authority/CapabilityChip";
 import { JsonBlock } from "@/components/ui/JsonBlock";
 import { PhaseAction } from "@/components/trial/PhaseAction";
+import { PassportProof } from "@/components/trial/PassportProof";
 import { CHECK_META } from "@/lib/status";
 import { dateTime, shortHash } from "@/lib/formatting";
 import type { CheckResult } from "@/lib/schemas";
@@ -156,6 +157,7 @@ export default function PassportPage() {
             <KV k="Key events">{p.evidence.keyEventIds.length}</KV>
           </dl>
         </Panel>
+        <PassportProof p={p} />
         <Panel title="Limitations" id="limitations">
           <ul className="list-disc space-y-1 pl-4 text-[13px]">
             {p.limitations.map((l) => <li key={l}>{l}</li>)}

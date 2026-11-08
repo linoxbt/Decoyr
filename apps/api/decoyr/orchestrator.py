@@ -154,6 +154,16 @@ def recover_orphans() -> None:
 # Worker
 # ---------------------------------------------------------------------------
 
+def _file_digest(path: str) -> str | None:
+    import hashlib
+
+    try:
+        with open(path, "rb") as f:
+            return "sha256:" + hashlib.sha256(f.read()).hexdigest()
+    except OSError:
+        return None
+
+
 def _update_run(run_id: str, **values: Any) -> None:
     db.update_row(db.runs, "id", run_id, values)
 
@@ -310,7 +320,7 @@ def _run_process(trial, run, env, wall, limits, stop, drill, out) -> dict:
     events.emit(tid, rid, "sandbox", "sandbox.container.created", f"{label} (pid {proc.pid}) with a minimal environment; dev mode is not a security boundary.",
                 title=label, decision="observed", evidence={"pid": proc.pid, "mode": "process", "drill": drill, "wallSeconds": wall})
     if not drill:
-        _update_sandbox(rid, container=f"pid {proc.pid}")
+        _update_sandbox(rid, container=f"pid {proc.pid}", runtime=f"process:{settings.candidate_entry}", runtimeDigest=_file_digest(settings.candidate_entry))
         events.emit(tid, rid, "orchestrator", "run.started", f"{run['type'].capitalize()} run started: candidate launched with a {wall}s wall-clock limit.",
                     title=f"{run['type'].capitalize()} run started", decision="observed")
 
@@ -361,7 +371,11 @@ def _run_docker(trial, run, env, wall, limits, stop, drill, out) -> dict:
                     title=f"Container {container.name} started", target=container.name, decision="observed",
                     evidence={"container": container.name, "image": image, "network": net_name, "drill": drill, **{k: str(v) for k, v in harden_kwargs(limits).items()}})
         if not drill:
-            _update_sandbox(rid, container=container.name, network=net_name)
+            try:
+                digest = container.image.id  # sha256 content digest of the exact image that ran
+            except Exception:
+                digest = None
+            _update_sandbox(rid, container=container.name, network=net_name, image=image, runtime=image, runtimeDigest=digest)
             events.emit(tid, rid, "orchestrator", "run.started", f"{run['type'].capitalize()} run started in container {container.name}.",
                         title=f"{run['type'].capitalize()} run started", decision="observed")
 

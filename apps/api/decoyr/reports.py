@@ -289,6 +289,28 @@ def _limitations(trial: dict, simulated: bool, untested: list[str]) -> list[str]
     return out
 
 
+def _fingerprint(trial: dict, agent: dict, base: dict | None, rep: dict | None, evs: list[dict], inf: dict, g: dict | None, model_in_loop: bool) -> dict:
+    """What actually ran, independent of the developer's declared labels."""
+    run = rep or base or {}
+    sb = run.get("sandbox") or {}
+    prompt = ((agent.get("config") or {}).get("systemPrompt") or "")
+    served = sorted({(e.get("evidence") or {}).get("model") for e in evs if e["type"] == "model.response" and (e.get("evidence") or {}).get("model")})
+    return {
+        "runtime": sb.get("runtime") or sb.get("image"),
+        "runtimeDigest": sb.get("runtimeDigest"),
+        "sandbox": sb.get("mode"),
+        "systemPromptSha256": hashlib.sha256(prompt.encode()).hexdigest() if prompt else None,
+        "modelRequested": agent.get("model") or inf["model"],
+        "modelsServed": served,  # as reported by the provider in each response, not as declared
+        "inference": inf["mode"],
+        "modelCalls": {"baseline": (base or {}).get("model_calls", 0), "replay": (rep or {}).get("model_calls", 0)},
+        "toolCalls": {"baseline": (base or {}).get("tool_calls", 0), "replay": (rep or {}).get("tool_calls", 0)},
+        "modelInTheLoop": model_in_loop,
+        "worldSha256": trial["world_sha256"],
+        "guardSha256": g["sha256"] if g else None,
+    }
+
+
 def passport(trial: dict) -> dict:
     runs = runs_of(trial)
     base = latest(runs, "baseline", completed=True)
@@ -302,9 +324,12 @@ def passport(trial: dict) -> dict:
     auth_caps = (auth["data"].get("capabilities") if auth else None) or []
 
     missing = [p for p, ok in (("baseline", base), ("calibration", g), ("replay", rep_done)) if not ok]
-    calibrated = not missing and _task_pass(rep_done) and _sec_pass(rep_done)
+    # Model in the loop: both runs must have made model calls through the relay, so a scripted
+    # program that never consults a model can't earn the label.
+    model_in_loop = bool(base and rep_done and (base["model_calls"] or 0) > 0 and (rep_done["model_calls"] or 0) > 0)
+    calibrated = not missing and _task_pass(rep_done) and _sec_pass(rep_done) and model_in_loop
     status = "incomplete" if missing else ("calibrated" if calibrated else "not_calibrated")
-    pid = "psp_" + hashlib.sha256(f"{trial['id']}|{base and base['id']}|{g and g['id']}|{rep_done and rep_done['id']}".encode()).hexdigest()[:20]
+    pid = "psp_" + hashlib.sha256(f"v2|{trial['id']}|{base and base['id']}|{g and g['id']}|{rep_done and rep_done['id']}".encode()).hexdigest()[:20]
 
     if status != "incomplete":
         stored = db.get_one(db.passports, id=pid)
@@ -353,7 +378,8 @@ def passport(trial: dict) -> dict:
         "label": calibration_label(trial) if calibrated else "Not calibrated",
         "status": status, "missingPhases": missing,
         "generatedAt": (rep_done or {}).get("ended_at") or now_iso(),
-        "identity": {"agent": agent["name"], "version": agent["version"], "purpose": agent["purpose"], "model": agent["model"] or inf["model"],
+        "fingerprint": _fingerprint(trial, agent, base, rep_done, base_evs + rep_evs, inf, g, model_in_loop),
+        "identity": {"declared": True, "agent": agent["name"], "version": agent["version"], "purpose": agent["purpose"], "model": agent["model"] or inf["model"],
                      "trialId": trial["id"], "trialTime": (base or {}).get("started_at") or trial["created_at"],
                      "artifactSha256": art["sha256"] if art else None},
         "coverage": {"worldVersion": trial["world_version"], "scenarioId": trial["scenario_id"], "scenarioPack": trial["scenario_pack"],
@@ -372,7 +398,9 @@ def passport(trial: dict) -> dict:
             "sameSeed": world_identical(trial),
         } if base and rep_done else None,
         "evidence": {"eventCount": all_count, "baselineEvents": len(base_evs), "replayEvents": len(rep_evs), "keyEventIds": key_ids},
-        "limitations": _limitations(trial, inf["mode"] == "simulated", untested),
+        "limitations": _limitations(trial, inf["mode"] == "simulated", untested)
+        + ["Agent name, version and purpose are declared by the developer; the fingerprint (runtime digest, prompt hash, models served) identifies what actually ran."]
+        + ([] if model_in_loop or missing else ["No model calls were recorded in at least one run, so the result is not attributed to an AI agent and the Passport is not labeled calibrated."]),
     }
     if status != "incomplete":
         try:
