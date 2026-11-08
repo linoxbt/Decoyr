@@ -9,8 +9,6 @@ type UiState = {
   setTraceFilter: (f: TraceFilter) => void;
   selectedEventId: string | null;
   selectEvent: (id: string | null) => void;
-  adminToken: string;
-  setAdminToken: (t: string) => void;
 };
 
 export const useUi = create<UiState>((set) => ({
@@ -20,6 +18,4 @@ export const useUi = create<UiState>((set) => ({
   setTraceFilter: (traceFilter) => set({ traceFilter }),
   selectedEventId: null,
   selectEvent: (selectedEventId) => set({ selectedEventId }),
-  adminToken: "",
-  setAdminToken: (adminToken) => set({ adminToken }),
 }));

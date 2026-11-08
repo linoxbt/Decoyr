@@ -35,7 +35,7 @@ export default function ProductOverview() {
             ["Guard", "Read the compiled policy and its rules."],
             ["Replay", "Compare baseline and guarded replay side by side."],
             ["Passport", "Hand a printable, scoped record to a reviewer."],
-            ["Agents / Settings", "Browse agent profiles and their trials; check system status and reset the demo."],
+            ["Agents", "Browse agent profiles and the trials run for each."],
           ]}
         />
       </DocSection>

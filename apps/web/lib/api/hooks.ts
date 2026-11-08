@@ -197,15 +197,3 @@ export function useReplayRun(id: string) {
   const inv = useInvalidateTrial(id);
   return useMutation({ mutationFn: () => api<RunSummary>(`/trials/${id}/replay`, { method: "POST" }), onSuccess: inv });
 }
-
-export function useResetDemo() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (adminToken?: string) =>
-      api<{ ok: boolean; demoTrialId: string | null }>("/demo/reset", {
-        method: "POST",
-        headers: adminToken ? { "X-Decoyr-Admin": adminToken } : undefined,
-      }),
-    onSuccess: () => qc.invalidateQueries(),
-  });
-}
