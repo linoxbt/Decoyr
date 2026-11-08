@@ -76,7 +76,7 @@ bash tests/containment/run.sh`}</CodeFrame>
             <><strong>Change invalidates.</strong> A new agent version, model, prompt or task needs a new trial.</>,
           ]}
         />
-        <Callout tone="warning" title="Process mode is for development">The process sandbox (used by the all-in-one deployment) runs the candidate as a separate OS process with a minimal environment. It is not a security boundary, and the system status and every Passport say so. Use the Docker sandbox for isolation evidence.</Callout>
+        <Callout tone="warning" title="Process mode is for development">The process sandbox (local development) runs the candidate as a separate OS process. It is not a security boundary, and the system status and every Passport say so. The live deployment uses the Docker sandbox.</Callout>
       </DocSection>
     </DocPage>
   );

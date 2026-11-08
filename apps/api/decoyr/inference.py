@@ -43,11 +43,14 @@ def resolve_model() -> str:
         try:
             models = [m.id for m in client().models.list().data]
             preferred = [m for m in models if any(k in m.lower() for k in ("instruct", "chat", "llama", "qwen", "kimi", "deepseek", "mistral", "gpt"))]
-            _model = (preferred or models or ["unknown"])[0]
+            picked = (preferred or models or [None])[0]
         except Exception as e:  # pragma: no cover - network
             log.warning("could not list Vultr models: %s", e)
-            _model = "unknown"
-        return _model
+            picked = None
+        if picked:
+            _model = picked  # cache a real id only; a failure is retried next call
+            return _model
+        return "unknown"
 
 
 def info() -> dict:
@@ -134,7 +137,7 @@ def complete_text(system: str, user: str, max_tokens: int = 1200) -> str | None:
             model=resolve_model(),
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             temperature=0,
-            max_tokens=max(max_tokens, settings.max_completion_tokens),
+            max_tokens=min(max_tokens, settings.max_completion_tokens),
             extra_body=_reasoning_extra() or None,
         )
         return resp.choices[0].message.content

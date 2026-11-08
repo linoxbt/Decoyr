@@ -139,7 +139,6 @@ def trial_runs(trial_id: str) -> list[dict]:
 
 
 def run_to_api(r: dict) -> dict:
-    from .analysis import db as _  # noqa: F401  (keeps import graph simple)
 
     arts = db.get_many(db.artifacts, order_by=[db.artifacts.c.created_at], run_id=r["id"])
     dur = None

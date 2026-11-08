@@ -35,7 +35,6 @@ from .ids import new_id, now_iso, parse_iso
 
 log = logging.getLogger("decoyr.orchestrator")
 
-IMPLEMENTED = True
 ACTIVE = ("queued", "preparing", "running")
 MAX_CONCURRENT = max(1, int(os.environ.get("DECOYR_MAX_CONCURRENT_RUNS", "3") or 3))
 LATE_EVENT_GRACE = 0.6  # seconds to let mcp-city flush its final tool.result events

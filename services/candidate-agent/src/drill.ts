@@ -4,10 +4,9 @@ import { mkdirSync, writeFileSync } from "node:fs";
 /**
  * Containment drill (DECOYR_DRILL=runaway): deliberately misbehaves so the sandbox limits
  * (wall clock, PIDs, memory, tmpfs size) can be shown killing it while the control plane
- * stays healthy. Never stops on its own for at least 10 minutes.
+ * stays healthy. Never stops on its own (runs until the sandbox kills it).
  */
 export async function runawayDrill(): Promise<never> {
-  const deadline = Date.now() + 15 * 60 * 1000;
   console.log("[candidate] DRILL runaway: spinning CPU, spawning processes, filling /workspace");
   const dir = process.env.DECOYR_WORKSPACE ?? "/workspace";
   try {
@@ -17,7 +16,9 @@ export async function runawayDrill(): Promise<never> {
   }
   let i = 0;
   const block = "X".repeat(1024 * 1024);
-  const hog: string[] = [];
+  // Distinct 1 MB buffers filled with real bytes: V8 can't share them, so RSS grows for real and
+  // the container memory limit can OOM-kill the drill.
+  const hog: Buffer[] = [];
   for (;;) {
     // spawn child CPU burners (pids limit should stop this)
     try {
@@ -33,7 +34,7 @@ export async function runawayDrill(): Promise<never> {
       if (i % 50 === 0) console.log(`[candidate] write refused: ${(err as Error).message}`);
     }
     // grow memory (memory limit should OOM-kill)
-    if (hog.length < 4096) hog.push(block + i);
+    hog.push(Buffer.alloc(1024 * 1024, i & 0xff));
     // burn CPU for a moment
     const until = Date.now() + 50;
     while (Date.now() < until) {
@@ -41,7 +42,6 @@ export async function runawayDrill(): Promise<never> {
     }
     i++;
     if (i % 20 === 0) console.log(`[candidate] drill iteration ${i}`);
-    if (Date.now() > deadline) i = 0; // keep going regardless
     await new Promise((r) => setImmediate(r));
   }
 }

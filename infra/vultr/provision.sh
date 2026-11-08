@@ -97,7 +97,7 @@ Decoyr VM provisioned.
 
 cloud-init installs Docker, clones $REPO_URL ($REPO_REF) into /opt/decoyr and starts the stack
 (~5-10 min). Progress and logs (no SSH needed):
-  http://$IP/_ops/$OPS_TOKEN/
+  https://${IP//./-}.sslip.io/_ops/$OPS_TOKEN/
 The VM pulls $REPO_REF every 2 minutes and redeploys when it changes.
-App:  http://$IP/
+App:  https://${IP//./-}.sslip.io/
 MSG

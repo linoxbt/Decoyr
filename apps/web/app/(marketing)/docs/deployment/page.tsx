@@ -1,52 +1,46 @@
 import type { Metadata } from "next";
 import { CodeFrame } from "@/components/marketing/Section";
-import { Bullets, Callout, Code, DocPage, DocSection, DocTable } from "@/components/docs/Doc";
+import { Bullets, Callout, Code, DocPage, DocSection } from "@/components/docs/Doc";
 
-export const metadata: Metadata = { title: "Deployment — Docs", description: "Deploy Decoyr on a Vultr VM with Docker isolation, or as an all-in-one demo service with a separately hosted console." };
+export const metadata: Metadata = { title: "Deployment — Docs", description: "Deploy Decoyr on a single Vultr Cloud Compute VM with Docker isolation, provisioned from the Vultr API and kept in sync from git." };
 
 export default function Deployment() {
   return (
-    <DocPage path="/docs/deployment" title="Deployment" lead="Two supported shapes: the full stack on one Vultr VM with Docker isolation, or an all-in-one demo service with the console hosted separately.">
-      <DocSection id="options" title="Choose a shape">
-        <DocTable
-          head={["", "Vultr VM (Docker)", "All-in-one service"]}
-          rows={[
-            ["Sandbox", "Hardened container per run, per-run internal network", "Separate process (not a security boundary)"],
-            ["Where", "infra/docker + infra/vultr", "infra/railway/Dockerfile (any container PaaS)"],
-            ["Use for", "Real isolation evidence", "Public demos and evaluation"],
-          ]}
-        />
-      </DocSection>
-
-      <DocSection id="vultr" title="Vultr VM with Docker">
-        <p>One Vultr Cloud Compute VM runs the api, Postgres, mcp-city, egress-proxy, the web console and Caddy. Only the api container gets the Docker socket, through its group (<Code>DOCKER_GID</Code>), and runs as a non-root user. Candidates never get the socket.</p>
-        <CodeFrame title="terminal">{`cd infra/docker
-cp .env.example .env      # signing key, Postgres password, Vultr key, DOCKER_GID
-docker compose --profile build build
-docker compose up -d
-
-# or provision and deploy a VM end to end (see infra/vultr/README.md)
-bash infra/vultr/provision.sh
-bash infra/vultr/deploy.sh`}</CodeFrame>
-        <Callout>Run <Code>bash tests/containment/run.sh</Code> on the host after deploying to verify the sandbox boundary.</Callout>
-      </DocSection>
-
-      <DocSection id="all-in-one" title="All-in-one service">
-        <p><Code>infra/railway/Dockerfile</Code> builds the control plane, mcp-city, egress-proxy and the candidate into one image (build from the repository root). The startup script:</p>
+    <DocPage path="/docs/deployment" title="Deployment" lead="The full stack runs on one Vultr Cloud Compute VM with the Docker sandbox. It is provisioned from the Vultr API and updates itself from git — no SSH required.">
+      <DocSection id="provision" title="Provision the VM">
+        <p>One VM runs the api, Postgres, mcp-city, egress-proxy, the web console and Caddy. The services are split across three Docker networks: an internet-facing edge, an internal data network for Postgres, and an internal sandbox network for the candidate-facing services. Only the api container gets the Docker socket (through its group) and runs as a non-root user; candidates never get it.</p>
+        <CodeFrame title="terminal (from your machine)">{`export VULTR_API_KEY=...                       # Vultr account API key (stays local)
+export VULTR_SERVERLESS_INFERENCE_API_KEY=...  # written to a 0600 bootstrap file on the VM
+export DECOYR_MODEL=glm-5.3-flash
+./infra/vultr/provision.sh                     # firewall group + instance + cloud-init`}</CodeFrame>
+        <p>cloud-init installs Docker, clones the repository, generates the signing key, Postgres password and admin token <strong>on the VM</strong>, builds every image (including the candidate) and starts the stack. The VM then:</p>
         <Bullets
           items={[
-            "binds mcp-city and egress-proxy to loopback; only the API listens on $PORT",
-            "runs one API worker, because run state lives in-process",
-            "generates the internal signing key at boot if none is set, so it never leaves the container",
-            "generates an unguessable admin token unless DECOYR_ADMIN_TOKEN is set (demo reset disabled)",
-            "exits if any process dies, so the platform restarts the container",
+            "serves HTTPS on <public-ip>.sslip.io with an automatic Let's Encrypt certificate",
+            "pulls the tracked branch every 2 minutes and rebuilds only when it changes, and retries if a build fails",
+            "publishes non-secret status and logs at /_ops/<token>/ (no access logs, no secrets)",
           ]}
         />
-        <p>Attach PostgreSQL through <Code>DATABASE_URL</Code>, set <Code>DECOYR_PUBLIC_URL</Code> to the console origin, and use <Code>/api/v1/health</Code> as the healthcheck.</p>
+        <Callout>Set <Code>DECOYR_API_KEYS</Code> to require an <Code>X-Decoyr-Key</Code> on mutating routes, and <Code>DECOYR_ADMIN_TOKEN</Code> to enable demo reset. Both are optional; without them the deployment is an open public demo, rate-limited per IP.</Callout>
       </DocSection>
 
-      <DocSection id="console" title="Hosting the console separately">
-        <p>The Next.js console in <Code>apps/web</Code> can be deployed on its own (for example on Vercel with root directory <Code>apps/web</Code>). Set <Code>DECOYR_API_URL</Code> to the API origin, and <Code>NEXT_PUBLIC_DECOYR_STREAM_BASE</Code> to the same origin so the live trace streams directly.</p>
+      <DocSection id="verify" title="Verify">
+        <CodeFrame title="terminal">{`curl https://<ip>.sslip.io/api/v1/health
+curl https://<ip>.sslip.io/api/v1/system     # inference.mode "vultr", sandbox.mode "docker"
+bash tests/containment/run.sh                 # on the VM: prove the sandbox boundary`}</CodeFrame>
+      </DocSection>
+
+      <DocSection id="local" title="Run the stack locally">
+        <p>The same compose stack runs on any Docker host. Fill a real signing key and Postgres password (the stack refuses the defaults), then:</p>
+        <CodeFrame title="terminal">{`cd infra/docker
+cp .env.example .env            # set DECOYR_INTERNAL_SIGNING_KEY, POSTGRES_PASSWORD, DOCKER_GID, Vultr key
+docker compose --profile build build
+docker compose up -d`}</CodeFrame>
+        <p><Code>DOCKER_GID</Code> is the host Docker socket's group: <Code>stat -c %g /var/run/docker.sock</Code>.</p>
+      </DocSection>
+
+      <DocSection id="residual" title="Production hardening (residual risk)">
+        <p>The api container holds the Docker socket so the orchestrator can create and destroy per-run sandboxes. A compromise of the api is therefore host-root. For a hardened production deployment, put a filtering socket proxy in front of the daemon (allow only container and network create/start/kill/remove, reject privileged containers and bind mounts, allowlist images), or move the orchestrator into a service with no public routes, and run candidates under gVisor. The current setup is appropriate for a controlled demo, not untrusted multi-tenant production.</p>
       </DocSection>
     </DocPage>
   );

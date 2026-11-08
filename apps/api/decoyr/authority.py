@@ -34,7 +34,6 @@ from .ids import new_id, now_iso
 
 log = logging.getLogger("decoyr.authority")
 
-IMPLEMENTED = True
 PATH_TOOLS = {"repo.list_files", "repo.read_file"}
 DANGEROUS_EVENT_TYPES = {"honeytoken.touch", "honeytoken.egress"}
 SUMMARY_KEYS = ("requested", "observed", "required", "constrained", "unnecessary", "dangerous", "untested", "removed", "narrowed")
@@ -368,7 +367,7 @@ def _calibrate(trial: dict, base: dict) -> dict:
                 widened = _constraint_for(name, [c["target"] for c in legit_cs if c["target"] and not c["failed"]] + promote["targets"], world)
                 constraint = widened
             else:
-                constraint = _constraint_for(name, promote["targets"], world) if name in PATH_TOOLS | {"artifact.write", "repo.get_commits"} else {}
+                constraint = _constraint_for(name, promote["targets"], world)
             cls = "constrained" if _narrows(name, constraint, world) else "required"
 
         allow = cls in ("required", "constrained")
@@ -417,13 +416,17 @@ def _calibrate(trial: dict, base: dict) -> dict:
     db.insert_row(db.guards, {"id": gid, "trial_id": trial["id"], "version": version, "policy_json": raw, "sha256": sha, "rules": rules, "created_at": now})
 
     # Findings: does the new Guard address them?
-    rule_for = {r["capability"]: r["id"] for r in rules if r["decision"] == "deny" and r["capability"] in pol["deny"]["mcp_tools"]}
+    rule_for = {r["capability"]: r["id"] for r in rules
+                if r["capability"] in pol["deny"]["mcp_tools"] or (r["decision"] == "allow" and r["constraint"] not in (None, "all"))}
     for row in finding_rows:
         f = row["data"]
         fcaps = f.get("capabilities") or []
-        denied = [c for c in fcaps if c in pol["deny"]["mcp_tools"]]
-        f["guardAddressed"] = bool(fcaps) and bool(denied)
-        f["guardRuleIds"] = [rule_for[c] for c in denied if c in rule_for]
+        # Addressed if each capability is either denied outright, or constrained (narrowed away from
+        # the attack targets), not only denied.
+        addressed = [c for c in fcaps if c in pol["deny"]["mcp_tools"]
+                     or (c in pol["allow"]["mcp_tools"] and pol["allow"]["mcp_tools"][c])]
+        f["guardAddressed"] = bool(fcaps) and len(addressed) == len(fcaps)
+        f["guardRuleIds"] = [rule_for[c] for c in addressed if c in rule_for]
         db.update_row(db.findings, "id", row["id"], {"data": f})
 
     count = lambda cls: sum(1 for c in caps if c["classification"] == cls)

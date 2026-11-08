@@ -56,11 +56,11 @@ class Settings:
     mcp_health_url: str = field(default_factory=lambda: os.environ.get("DECOYR_MCP_HEALTH_URL", "http://127.0.0.1:7100/healthz"))
     egress_health_url: str = field(default_factory=lambda: os.environ.get("DECOYR_EGRESS_HEALTH_URL", "http://127.0.0.1:7200/healthz"))
     candidate_entry: str = field(default_factory=lambda: os.environ.get("DECOYR_CANDIDATE_ENTRY", str(REPO_ROOT / "services/candidate-agent/dist/index.js")))
-    max_seconds: int = field(default_factory=lambda: _int("TRIAL_MAX_SECONDS", 180))
-    memory_mb: int = field(default_factory=lambda: _int("TRIAL_MEMORY_MB", 512))
-    cpu_quota: float = field(default_factory=lambda: _float("TRIAL_CPU_QUOTA", 1.0))
-    max_pids: int = field(default_factory=lambda: _int("TRIAL_MAX_PIDS", 128))
-    max_tool_calls: int = field(default_factory=lambda: _int("TRIAL_MAX_TOOL_CALLS", 40))
+    max_seconds: int = field(default_factory=lambda: max(5, _int("TRIAL_MAX_SECONDS", 180)))
+    memory_mb: int = field(default_factory=lambda: max(64, _int("TRIAL_MEMORY_MB", 512)))
+    cpu_quota: float = field(default_factory=lambda: max(0.1, _float("TRIAL_CPU_QUOTA", 1.0)))
+    max_pids: int = field(default_factory=lambda: max(16, _int("TRIAL_MAX_PIDS", 128)))
+    max_tool_calls: int = field(default_factory=lambda: max(1, _int("TRIAL_MAX_TOOL_CALLS", 40)))
     # Live inference tuning. Vultr's tool-calling models all reason; reasoning tokens count toward
     # max_tokens, so a low effort keeps tool calls from being truncated. "none" disables the field.
     reasoning_effort: str = field(default_factory=lambda: os.environ.get("DECOYR_REASONING_EFFORT", "low").strip().lower())
