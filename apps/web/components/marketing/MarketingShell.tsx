@@ -4,21 +4,22 @@ import { Menu } from "lucide-react";
 import { Logo } from "@/components/shell/Logo";
 import { PreparedDemoButton } from "@/components/trial/PreparedDemoButton";
 
+/** Header links go to pages where you use the app. Everything you read lives under /docs. */
 export const NAV = [
-  { href: "/product", label: "Product" },
-  { href: "/use-cases", label: "Use cases" },
+  { href: "/app/trials", label: "Trials" },
+  { href: "/app/trials/new", label: "New trial" },
+  { href: "/app/agents", label: "Agents" },
   { href: "/docs", label: "Docs" },
-  { href: "/about", label: "About" },
 ];
 
 const FOOTER: { title: string; links: { href: string; label: string }[] }[] = [
   {
-    title: "Product",
+    title: "App",
     links: [
-      { href: "/product", label: "Overview" },
-      { href: "/use-cases", label: "Use cases" },
-      { href: "/app/trials", label: "Trials console" },
-      { href: "/about", label: "About" },
+      { href: "/app/trials", label: "Trials" },
+      { href: "/app/trials/new", label: "New trial" },
+      { href: "/app/agents", label: "Agents" },
+      { href: "/app/settings", label: "Settings" },
     ],
   },
   {
@@ -31,12 +32,12 @@ const FOOTER: { title: string; links: { href: string; label: string }[] }[] = [
     ],
   },
   {
-    title: "Trust & reference",
+    title: "Reference",
     links: [
       { href: "/docs/security", label: "Security model" },
-      { href: "/docs/architecture", label: "Architecture" },
       { href: "/docs/api", label: "API reference" },
       { href: "/docs/faq", label: "FAQ" },
+      { href: "/docs/about", label: "About" },
     ],
   },
 ];
@@ -53,15 +54,14 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="flex items-center gap-1 text-[13px]">
-            <Link href="/app/trials" className="hidden rounded px-2.5 py-1.5 text-muted hover:text-text sm:inline">Trials</Link>
-            <span className="hidden sm:inline"><PreparedDemoButton label="Test an agent" variant="primary" size="sm" /></span>
+                        <span className="hidden sm:inline"><PreparedDemoButton label="Test an agent" variant="primary" size="sm" /></span>
             {/* Mobile menu: native <details>, works without JavaScript. */}
             <details className="group relative lg:hidden">
               <summary className="flex size-8 cursor-pointer list-none items-center justify-center rounded-[6px] border border-border text-muted hover:text-text [&::-webkit-details-marker]:hidden" aria-label="Open menu">
                 <Menu className="size-4" aria-hidden />
               </summary>
               <nav aria-label="Mobile" className="absolute right-0 mt-2 w-56 rounded-[8px] border border-border bg-surface p-1.5 shadow-lg">
-                {[...NAV, { href: "/docs/how-it-works", label: "How it works" }, { href: "/docs/security", label: "Security model" }, { href: "/app/trials", label: "Trials console" }].map((n) => (
+                {[...NAV, { href: "/app/settings", label: "Settings" }].map((n) => (
                   <Link key={n.href} href={n.href} className="block rounded-[6px] px-3 py-2 text-[13px] text-text hover:bg-surface-2">{n.label}</Link>
                 ))}
               </nav>
