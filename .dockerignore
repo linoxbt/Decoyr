@@ -1,4 +1,4 @@
-# Only the api image builds from the repository root (apps/api/Dockerfile).
+# Root-context builds: apps/api/Dockerfile and infra/railway/Dockerfile.
 **/node_modules
 **/.venv
 **/dist
@@ -9,7 +9,5 @@
 **/*.db-*
 .git
 apps/web
-services
-infra
 tests
 docs
