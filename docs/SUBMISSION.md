@@ -58,8 +58,7 @@ Python · PostgreSQL · Caddy
 
 ## Links to fill in
 
-- Application URL: the Vultr deployment (`https://108-61-245-158.sslip.io` once HTTPS is live;
-  `http://108.61.245.158` meanwhile)
+- Application URL: https://108-61-245-158.sslip.io (Vultr Cloud Compute VM)
 - Public GitHub repository: https://github.com/linoxbt/Decoyr
 - Demo application platform: Web (Vultr Cloud Compute)
 
