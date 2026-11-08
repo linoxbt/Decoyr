@@ -15,12 +15,8 @@ const BOUNDARIES = [
 export function ArchitectureLive() {
   const { data } = useSystem();
   return (
-    <div className="mx-auto max-w-6xl px-4 py-14 md:px-6">
-      <h1 className="text-[32px] font-semibold tracking-[-0.02em]">Architecture</h1>
-      <p className="mt-3 max-w-3xl text-[15px] text-muted">
-        Vultr is the control plane, the inference provider and the execution substrate. Trusted and untrusted zones are separated by process, container, network and credential boundaries.
-      </p>
-      <div className="mt-4 flex flex-wrap gap-2 text-[12px]">
+    <div>
+      <div className="flex flex-wrap gap-2 text-[12px]">
         {data ? (
           <>
             <Badge tone={data.inference.mode === "vultr" ? "success" : "warning"} dot>Inference: {data.inference.mode === "vultr" ? `Vultr · ${data.inference.model}` : "simulated (no key configured)"}</Badge>
@@ -35,7 +31,7 @@ export function ArchitectureLive() {
       <div className="mt-6 rounded-[8px] border border-border bg-surface p-4">
         <ArchitectureDiagram inferenceMode={data?.inference.mode} sandboxMode={data?.sandbox.mode} />
       </div>
-      <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
         {BOUNDARIES.map(([t, d]) => (
           <div key={t} className="rounded-[8px] border border-border bg-surface p-4">
             <div className="text-[14px] font-semibold">{t}</div>

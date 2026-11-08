@@ -20,6 +20,16 @@ const csp = [
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  async redirects() {
+    // Documentation pages moved under /docs; keep old links working.
+    return [
+      { source: "/how-it-works", destination: "/docs/how-it-works", permanent: true },
+      { source: "/scenarios", destination: "/docs/scenarios", permanent: true },
+      { source: "/security", destination: "/docs/security", permanent: true },
+      { source: "/architecture", destination: "/docs/architecture", permanent: true },
+      { source: "/faq", destination: "/docs/faq", permanent: true },
+    ];
+  },
   async rewrites() {
     return [{ source: "/api/v1/:path*", destination: `${API}/api/v1/:path*` }];
   },

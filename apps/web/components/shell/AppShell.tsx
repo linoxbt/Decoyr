@@ -12,7 +12,7 @@ import { useSystem } from "@/lib/api/hooks";
 const NAV = [
   { href: "/app/trials", label: "Trials", icon: FlaskConical },
   { href: "/app/agents", label: "Agents", icon: Bot },
-  { href: "/architecture", label: "Architecture", icon: Network },
+  { href: "/docs/architecture", label: "Architecture", icon: Network },
   { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 

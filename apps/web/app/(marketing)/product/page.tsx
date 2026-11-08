@@ -158,7 +158,7 @@ export default function ProductPage() {
         </ol>
       </Section>
 
-      <CtaBand title="See the whole loop in about two minutes." lead="The prepared demo creates a fresh trial with ResearchBot 0.9.2 on Acme Labs v1." secondary={{ href: "/how-it-works", label: "How it works" }} />
+      <CtaBand title="See the whole loop in about two minutes." lead="The prepared demo creates a fresh trial with ResearchBot 0.9.2 on Acme Labs v1." secondary={{ href: "/docs/how-it-works", label: "How it works" }} />
     </>
   );
 }

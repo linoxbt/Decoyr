@@ -122,7 +122,7 @@ export default function UseCasesPage() {
         </div>
       </Section>
 
-      <CtaBand title="Start with the prepared demo." lead="ResearchBot 0.9.2 meets a poisoned README in Acme Labs. See which team's question it answers for you." secondary={{ href: "/faq", label: "Read the FAQ" }} />
+      <CtaBand title="Start with the prepared demo." lead="ResearchBot 0.9.2 meets a poisoned README in Acme Labs. See which team's question it answers for you." secondary={{ href: "/docs/faq", label: "Read the FAQ" }} />
     </>
   );
 }
