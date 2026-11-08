@@ -10,6 +10,7 @@ export const DOCS_NAV: DocGroup[] = [
       { href: "/docs/product", title: "Product overview" },
       { href: "/docs/use-cases", title: "Use cases" },
       { href: "/docs/quickstart", title: "Quickstart" },
+      { href: "/docs/agents", title: "Test your own agent" },
       { href: "/docs/configuration", title: "Configuration" },
       { href: "/docs/deployment", title: "Deployment" },
     ],

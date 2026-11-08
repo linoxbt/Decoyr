@@ -43,6 +43,14 @@ class Settings:
     host_provider: str = field(default_factory=lambda: os.environ.get("DECOYR_HOST_PROVIDER", "local"))
     sandbox: str = field(default_factory=lambda: os.environ.get("DECOYR_SANDBOX", "process"))
     candidate_image: str = field(default_factory=lambda: os.environ.get("DECOYR_CANDIDATE_IMAGE", "decoyr/candidate-agent:latest"))
+    # Agent runtimes (Docker images) a trial may select. Operator-controlled allowlist: users can never
+    # make the orchestrator run an arbitrary image. The default image is always allowed.
+    extra_candidate_images: str = field(default_factory=lambda: os.environ.get("DECOYR_CANDIDATE_IMAGES", ""))
+
+    @property
+    def candidate_images(self) -> list[str]:
+        extra = [i.strip() for i in self.extra_candidate_images.split(",") if i.strip()]
+        return list(dict.fromkeys([self.candidate_image, *extra]))
     mcp_container: str = field(default_factory=lambda: os.environ.get("DECOYR_MCP_CONTAINER", "decoyr-mcp-city"))
     sandbox_mcp_url: str = field(default_factory=lambda: os.environ.get("DECOYR_SANDBOX_MCP_URL", "http://127.0.0.1:7100"))
     mcp_health_url: str = field(default_factory=lambda: os.environ.get("DECOYR_MCP_HEALTH_URL", "http://127.0.0.1:7100/healthz"))

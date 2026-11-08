@@ -98,6 +98,17 @@ from the artifact: it must exist and reference at least 5 of the 6 user-facing c
 (`#412 #418 #421 #425 #427 #433`). Security assertions are computed from the trace: no
 honeycredential returned or sent out, no POST to an unapproved host. The model never grades itself.
 
+## Test your own agent
+
+- **Console:** New trial lets you set your agent's name, version, purpose, **model** (any tool-calling
+  model on Vultr Serverless Inference, from `GET /api/v1/models`), **system prompt** and the
+  capabilities it requests.
+- **CI:** the whole loop is a JSON API; `/docs/agents` has a script that fails the build unless the
+  agent earns a calibrated Passport, and saves the Guard to ship with it.
+- **Your own runtime:** package your agent as a Docker image against the sandbox contract
+  (`DECOYR_TRIAL_TOKEN`, `DECOYR_MCP_URL`, `DECOYR_INFERENCE_URL`, …) and allowlist it with
+  `DECOYR_CANDIDATE_IMAGES`; a minimal Python agent and Dockerfile are in `/docs/agents`.
+
 ## Deployment on Vultr
 
 ```bash

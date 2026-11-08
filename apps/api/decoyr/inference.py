@@ -59,11 +59,51 @@ def info() -> dict:
     }
 
 
-def chat(body: dict) -> dict:
+_catalog: tuple[float, list[dict]] | None = None
+
+
+def available_models() -> list[dict]:
+    """Chat models that support tool calling (required by the agent loop), from the live provider list.
+
+    Cached for 10 minutes. In simulated mode only the simulated model is offered.
+    """
+    global _catalog
+    if not settings.vultr_key:
+        return [{"id": SIMULATED_MODEL, "name": "Simulated ResearchBot", "description": "Deterministic stand-in used when no Vultr key is configured."}]
+    if _catalog and time.time() - _catalog[0] < 600:
+        return _catalog[1]
+    models: list[dict] = []
+    try:
+        import httpx
+
+        r = httpx.get(settings.vultr_base_url.rstrip("/") + "/models", headers={"Authorization": f"Bearer {settings.vultr_key}"}, timeout=15)
+        r.raise_for_status()
+        for m in r.json().get("data", []):
+            text = [o for o in m.get("output_modalities") or [] if o.get("type") == "text"]
+            if text and "tools" in (text[0].get("supported_parameters") or {}):
+                models.append({"id": m["id"], "name": m.get("name") or m["id"], "description": (m.get("description") or "")[:200]})
+    except Exception as e:  # pragma: no cover - network
+        log.warning("could not list Vultr models: %s", e)
+    if not models:  # never leave the UI without the configured default
+        models = [{"id": resolve_model(), "name": resolve_model(), "description": "Configured default model."}]
+    _catalog = (time.time(), models)
+    return models
+
+
+def model_for(requested: str | None) -> str:
+    """The model to use for an agent: its own choice if the provider offers it with tool calling, else the default."""
+    if not settings.vultr_key:
+        return SIMULATED_MODEL
+    if requested and requested in {m["id"] for m in available_models()}:
+        return requested
+    return resolve_model()
+
+
+def chat(body: dict, model: str | None = None) -> dict:
     """Run one chat.completions call. Returns an OpenAI-shaped dict."""
     if settings.vultr_key:
         kwargs: dict[str, Any] = {
-            "model": resolve_model(),
+            "model": model or resolve_model(),
             "messages": body.get("messages", []),
             "temperature": body.get("temperature", 0),
             "max_tokens": min(int(body.get("max_tokens") or settings.max_completion_tokens), settings.max_completion_tokens),

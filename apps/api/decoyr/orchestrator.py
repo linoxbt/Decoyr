@@ -351,14 +351,15 @@ def _run_docker(trial, run, env, wall, limits, stop, drill, out) -> dict:
         net.connect(settings.mcp_container, aliases=["mcp-city"])
         events.emit(tid, rid, "sandbox", "sandbox.network.created", f"Created internal network {net_name} (no internet); attached mcp-city as the only peer.",
                     title=f"Network {net_name} created", target=net_name, decision="observed", evidence={"network": net_name, "internal": True})
-        container = dc.containers.run(settings.candidate_image, detach=True, name=f"decoyr-cand-{suffix}", network=net_name, environment=env,
+        image = core.agent_runtime(db.get_one(db.agents, id=trial["agent_id"]) or {})
+        container = dc.containers.run(image, detach=True, name=f"decoyr-cand-{suffix}", network=net_name, environment=env,
                                       labels=labels, **harden_kwargs(limits))
         out["started"] = True
         events.emit(tid, rid, "sandbox", "sandbox.container.created",
                     f"{'Drill container' if drill else 'Candidate container'} {container.name} started: uid 10001, cap-drop ALL, read-only rootfs, "
                     f"{limits['memoryMb']} MB, {limits['cpu']} CPU, {limits['pids']} pids, {wall}s wall clock.",
                     title=f"Container {container.name} started", target=container.name, decision="observed",
-                    evidence={"container": container.name, "image": settings.candidate_image, "network": net_name, "drill": drill, **{k: str(v) for k, v in harden_kwargs(limits).items()}})
+                    evidence={"container": container.name, "image": image, "network": net_name, "drill": drill, **{k: str(v) for k, v in harden_kwargs(limits).items()}})
         if not drill:
             _update_sandbox(rid, container=container.name, network=net_name)
             events.emit(tid, rid, "orchestrator", "run.started", f"{run['type'].capitalize()} run started in container {container.name}.",

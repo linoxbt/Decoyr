@@ -266,7 +266,15 @@ async def system():
 def scenario_catalog():
     cat = scenarios.catalog()
     cat["builtinAgents"] = [core.agent_to_api(a) for a in db.get_many(db.agents, builtin=1)]
+    cat["runtimes"] = [{"id": img, "default": img == settings.candidate_image} for img in settings.candidate_images]
     return cat
+
+
+@app.get(f"{P}/models")
+def list_models():
+    """Models an agent can use: chat models with tool calling on Vultr Serverless Inference."""
+    info = inference.info()
+    return {"mode": info["mode"], "provider": info["provider"], "default": info["model"], "models": inference.available_models()}
 
 
 @app.get(f"{P}/agents")
@@ -309,7 +317,16 @@ class AgentSpec(BaseModel):
     version: str = Field(min_length=1, max_length=40)
     purpose: str = Field(default="", max_length=500)
     model: str | None = Field(default=None, max_length=200)
+    systemPrompt: str | None = Field(default=None, max_length=8000)
+    runtime: str | None = Field(default=None, max_length=200)
     requestedCapabilities: list[str] = Field(default_factory=list, max_length=32)
+
+
+def _validate_agent(spec: AgentSpec) -> None:
+    if spec.model and settings.vultr_key and spec.model not in {m["id"] for m in inference.available_models()}:
+        raise HTTPException(400, f"Model {spec.model} is not available with tool calling on Vultr Serverless Inference. See GET /api/v1/models.")
+    if spec.runtime and spec.runtime not in settings.candidate_images:
+        raise HTTPException(400, f"Runtime {spec.runtime} is not on this deployment's allowlist (DECOYR_CANDIDATE_IMAGES).")
 
 
 class CreateTrialRequest(BaseModel):
@@ -337,6 +354,7 @@ def _known_world(version: str) -> None:
 def create_trial(body: CreateTrialRequest):
     _check_rate()
     _known_world(body.worldVersion)
+    _validate_agent(body.agent)
     agent = core.get_or_create_agent(body.agent.model_dump())
     t = core.create_trial(agent, body.worldVersion, body.taskId, body.scenarioPack, body.name)
     return core.trial_to_api(t)
@@ -907,7 +925,9 @@ async def internal_inference(request: Request, x_decoyr_trial_token: str | None 
 
 
 def _do_inference(run: dict, trial: dict, body: dict) -> Any:
-    info = inference.info()
+    info = dict(inference.info())
+    agent = db.get_one(db.agents, id=trial["agent_id"]) or {}
+    info["model"] = inference.model_for(agent.get("model"))  # the agent's own model, if the provider offers it
     simulated = info["mode"] == "simulated"
     honey = scenarios.honeytokens(world_for(trial))
     msgs = body.get("messages") or []
@@ -923,7 +943,7 @@ def _do_inference(run: dict, trial: dict, body: dict) -> Any:
     bump_run(run["id"], model_calls=1)
     t0 = time.monotonic()
     try:
-        resp = inference.chat(body)
+        resp = inference.chat(body, model=info["model"])
     except Exception as exc:  # pragma: no cover - network
         ms = int((time.monotonic() - t0) * 1000)
         ref = new_id("err")

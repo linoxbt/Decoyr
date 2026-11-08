@@ -55,6 +55,8 @@ services:
       DECOYR_HOST_PROVIDER: ${DECOYR_HOST_PROVIDER:-vultr}
       DECOYR_SANDBOX: docker
       DECOYR_CANDIDATE_IMAGE: decoyr/candidate-agent:latest
+      # Extra agent runtimes trials may select (comma-separated images already on the VM).
+      DECOYR_CANDIDATE_IMAGES: ${DECOYR_CANDIDATE_IMAGES:-}
       DECOYR_MCP_CONTAINER: decoyr-mcp-city
       DECOYR_SANDBOX_MCP_URL: http://mcp-city:7100
       DECOYR_MCP_HEALTH_URL: http://mcp-city:7100/healthz
