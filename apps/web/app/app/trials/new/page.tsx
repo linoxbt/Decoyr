@@ -11,7 +11,7 @@ import { Button, buttonClass } from "@/components/ui/Button";
 import { Panel, SectionLabel } from "@/components/ui/Panel";
 import { ErrorState, PageSkeleton } from "@/components/ui/States";
 import { Badge } from "@/components/ui/Badge";
-import { useCreateTrial, useScenarios } from "@/lib/api/hooks";
+import { useCreateTrial, useModels, useScenarios } from "@/lib/api/hooks";
 import type { CapabilityGroup } from "@/lib/schemas";
 import { cn } from "@/components/ui/cn";
 
@@ -21,6 +21,8 @@ const schema = z.object({
   version: z.string().trim().min(1, "Version is required").max(30),
   purpose: z.string().trim().min(8, "Describe the purpose in one line (8+ characters)").max(200),
   model: z.string().max(120).optional(),
+  systemPrompt: z.string().max(8000, "Keep instructions under 8,000 characters").optional(),
+  runtime: z.string().optional(),
   requestedCapabilities: z.array(z.string()).min(1, "Request at least one capability"),
   worldVersion: z.string().min(1),
   taskId: z.string().min(1),
@@ -34,13 +36,13 @@ const STEPS = ["Candidate", "Requested authority", "Trial"];
 export default function NewTrialPage() {
   const router = useRouter();
   const { data: catalog, error, isLoading, refetch } = useScenarios();
+  const { data: modelCatalog } = useModels();
   const create = useCreateTrial();
   const [step, setStep] = useState(0);
-  const [advanced, setAdvanced] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", version: "", purpose: "", model: "", requestedCapabilities: [], worldVersion: "", taskId: "", scenarioPack: [] },
+    defaultValues: { name: "", version: "", purpose: "", model: "", systemPrompt: "", runtime: "", requestedCapabilities: [], worldVersion: "", taskId: "", scenarioPack: [] },
     mode: "onTouched",
   });
   const { register, setValue, watch, trigger, handleSubmit, formState } = form;
@@ -56,7 +58,9 @@ export default function NewTrialPage() {
         name: demo.name,
         version: demo.version,
         purpose: demo.purpose,
-        model: demo.model,
+        model: "",
+        systemPrompt: demo.systemPrompt ?? "",
+        runtime: demo.runtime ?? "",
         requestedCapabilities: demo.requestedCapabilities,
         worldVersion: catalog.worlds[0]?.version ?? "acme-labs-v1",
         taskId: catalog.tasks[0]?.id ?? "",
@@ -82,10 +86,17 @@ export default function NewTrialPage() {
 
   const onSubmit = (v: FormValues) => {
     const builtin = catalog.builtinAgents.find((a) => a.id === v.profileId);
-    const unchangedBuiltin = builtin && builtin.name === v.name && builtin.version === v.version;
+    const prompt = (v.systemPrompt ?? "").trim();
+    const unchangedBuiltin =
+      builtin && builtin.name === v.name && builtin.version === v.version && !v.model &&
+      prompt === (builtin.systemPrompt ?? "").trim() && (!v.runtime || v.runtime === builtin.runtime);
     create.mutate(
       {
-        agent: { profileId: unchangedBuiltin ? builtin.id : undefined, name: v.name, version: v.version, purpose: v.purpose, model: v.model || undefined, requestedCapabilities: v.requestedCapabilities },
+        agent: {
+          profileId: unchangedBuiltin ? builtin.id : undefined, name: v.name, version: v.version, purpose: v.purpose,
+          model: v.model || undefined, systemPrompt: prompt || undefined, runtime: v.runtime || undefined,
+          requestedCapabilities: v.requestedCapabilities,
+        },
         worldVersion: v.worldVersion,
         taskId: v.taskId,
         scenarioPack: v.scenarioPack,
@@ -124,7 +135,7 @@ export default function NewTrialPage() {
                     <button
                       type="button"
                       key={a.id}
-                      onClick={() => form.reset({ ...form.getValues(), profileId: a.id, name: a.name, version: a.version, purpose: a.purpose, model: a.model, requestedCapabilities: a.requestedCapabilities })}
+                      onClick={() => form.reset({ ...form.getValues(), profileId: a.id, name: a.name, version: a.version, purpose: a.purpose, model: "", systemPrompt: a.systemPrompt ?? "", runtime: a.runtime ?? "", requestedCapabilities: a.requestedCapabilities })}
                       className={cn("rounded-[6px] border px-3 py-2 text-left", values.profileId === a.id ? "border-text bg-surface-2" : "border-border hover:bg-surface-2")}
                     >
                       <div className="text-[13px] font-medium">{a.name} <span className="mono text-muted">{a.version}</span></div>
@@ -144,17 +155,35 @@ export default function NewTrialPage() {
               <Field label="Declared purpose" error={formState.errors.purpose?.message}>
                 <input {...register("purpose")} className={inputCls} />
               </Field>
-              <div>
-                <button type="button" onClick={() => setAdvanced((a) => !a)} className="text-[12px] font-medium text-muted hover:text-text" aria-expanded={advanced}>
-                  {advanced ? "Hide" : "Show"} advanced
-                </button>
-                {advanced && (
-                  <div className="mt-2">
-                    <Field label="Model (Vultr Serverless Inference)" hint="Leave empty to use the control plane default.">
-                      <input {...register("model")} className={cn(inputCls, "mono")} />
+              <div className="space-y-3 rounded-[6px] border border-border p-3">
+                <SectionLabel>Agent configuration</SectionLabel>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field
+                    label="Model"
+                    hint={modelCatalog?.mode === "simulated" ? "No Vultr key configured: the deterministic simulated model runs." : "Chat models with tool calling on Vultr Serverless Inference."}
+                  >
+                    <select {...register("model")} className={cn(inputCls, "mono")}>
+                      <option value="">Default ({modelCatalog?.default ?? "control plane default"})</option>
+                      {(modelCatalog?.models ?? []).filter((m) => m.id !== modelCatalog?.default).map((m) => (
+                        <option key={m.id} value={m.id} title={m.description}>{m.id}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  {(catalog.runtimes?.length ?? 0) > 1 ? (
+                    <Field label="Runtime" hint="Agent runtime image. Operators add their own with DECOYR_CANDIDATE_IMAGES.">
+                      <select {...register("runtime")} className={cn(inputCls, "mono")}>
+                        {catalog.runtimes!.map((r) => <option key={r.id} value={r.default ? "" : r.id}>{r.id}{r.default ? " (built-in)" : ""}</option>)}
+                      </select>
                     </Field>
-                  </div>
-                )}
+                  ) : (
+                    <Field label="Runtime" hint="Bring your own agent: see Docs › Test your own agent.">
+                      <input value={catalog.runtimes?.[0]?.id ?? "built-in runtime"} readOnly className={cn(inputCls, "mono text-muted")} />
+                    </Field>
+                  )}
+                </div>
+                <Field label="Agent instructions (system prompt)" error={formState.errors.systemPrompt?.message} hint="Paste your agent's real instructions to test how it behaves. Sent only to the model, never shown to the world.">
+                  <textarea {...register("systemPrompt")} rows={6} className="w-full rounded-[6px] border border-border-strong bg-surface px-2.5 py-2 font-mono text-[12.5px] leading-relaxed outline-none focus:border-text" />
+                </Field>
               </div>
             </div>
           </Panel>
@@ -227,7 +256,7 @@ export default function NewTrialPage() {
               <div className="rounded-[6px] border border-border bg-surface-2 px-3 py-2.5 text-[12.5px]">
                 <SectionLabel className="mb-1">Summary</SectionLabel>
                 <p>
-                  <strong>{values.name} {values.version}</strong> will be asked to <em>{task?.goal ?? "—"}</em> inside <strong>{world?.name ?? values.worldVersion}</strong>, with {values.requestedCapabilities.length} requested capabilities and {values.scenarioPack.length} scenario pack(s).
+                  <strong>{values.name} {values.version}</strong> on <span className="mono">{values.model || modelCatalog?.default || "default model"}</span> will be asked to <em>{task?.goal ?? "—"}</em> inside <strong>{world?.name ?? values.worldVersion}</strong>, with {values.requestedCapabilities.length} requested capabilities and {values.scenarioPack.length} scenario pack(s).
                 </p>
                 <p className="mt-1 text-muted">
                   Limits per run: {L.wallSeconds}s wall clock · {L.memoryMb} MB · {L.cpu} CPU · {L.pids} PIDs · {L.maxToolCalls} tool calls. A baseline run typically takes 20–90s; the guarded replay takes about the same.

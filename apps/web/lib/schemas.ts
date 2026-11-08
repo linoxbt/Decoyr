@@ -51,7 +51,17 @@ export type AgentProfile = {
   trialCount?: number; // only on GET /agents
   lastTestedAt?: string | null;
   latestCalibration?: string | null; // e.g. "Calibrated: Release Notes / Acme Labs v1"
+  systemPrompt?: string; // the agent's own instructions, passed to its runtime
+  runtime?: string; // agent runtime image (operator allowlist)
   createdAt: string;
+};
+
+// GET /api/v1/models — chat models with tool calling on Vultr Serverless Inference
+export type ModelCatalog = {
+  mode: "vultr" | "simulated";
+  provider: string;
+  default: string;
+  models: { id: string; name: string; description: string }[];
 };
 
 // ---------------------------------------------------------------------------
@@ -81,6 +91,7 @@ export type ScenarioCatalog = {
   packs: ScenarioPack[];
   capabilities: CapabilityInfo[];
   builtinAgents: AgentProfile[];
+  runtimes?: { id: string; default: boolean }[]; // agent runtime images this deployment allows
   limits: { wallSeconds: number; memoryMb: number; cpu: number; pids: number; maxToolCalls: number };
 };
 
@@ -184,7 +195,9 @@ export type CreateTrialRequest = {
     name: string;
     version: string;
     purpose: string;
-    model?: string;
+    model?: string; // must be one of GET /models (validated server-side)
+    systemPrompt?: string; // up to 8000 characters
+    runtime?: string; // one of ScenarioCatalog.runtimes
     requestedCapabilities: string[];
   };
   worldVersion: string; // "acme-labs-v1"

@@ -2,23 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./client";
-import type {
-  AgentProfile,
-  Artifact,
-  AuthorityReport,
-  CreateTrialRequest,
-  Finding,
-  Guard,
-  Passport,
-  ReplayComparison,
-  RunSummary,
-  ScenarioCatalog,
-  SystemInfo,
-  TraceEvent,
-  Trial,
-  TrialListItem,
-  WorldView,
-} from "../schemas";
+import type { AgentProfile, Artifact, AuthorityReport, CreateTrialRequest, Finding, Guard, Passport, ReplayComparison, RunSummary, ScenarioCatalog, SystemInfo, TraceEvent, Trial, TrialListItem, WorldView, ModelCatalog } from "../schemas";
 
 export const qk = {
   system: ["system"] as const,
@@ -45,6 +29,10 @@ function isActive(t?: Trial | null) {
 
 export function useSystem() {
   return useQuery({ queryKey: qk.system, queryFn: () => api<SystemInfo>("/system"), staleTime: 30_000, retry: 1 });
+}
+
+export function useModels() {
+  return useQuery({ queryKey: ["models"], queryFn: () => api<ModelCatalog>("/models"), staleTime: 5 * 60_000 });
 }
 
 export function useScenarios() {

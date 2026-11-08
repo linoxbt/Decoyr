@@ -45,11 +45,19 @@ def ensure_builtin_agents() -> None:
             })
 
 
+def agent_runtime(a: dict) -> str:
+    """The agent's runtime image if the operator allows it, else the default candidate image."""
+    rt = ((a.get("config") or {}).get("runtime") or "").strip()
+    return rt if rt in settings.candidate_images else settings.candidate_image
+
+
 def agent_to_api(a: dict, with_stats: bool = False) -> dict:
     out = {
         "id": a["id"], "name": a["name"], "version": a["version"], "purpose": a["purpose"],
-        "model": a["model"] or inference.info()["model"], "requestedCapabilities": a["requested_capabilities"],
+        "model": inference.model_for(a["model"]) if a["model"] else inference.info()["model"], "requestedCapabilities": a["requested_capabilities"],
         "builtin": bool(a["builtin"]), "createdAt": a["created_at"],
+        "systemPrompt": (a.get("config") or {}).get("systemPrompt") or "",
+        "runtime": agent_runtime(a),
     }
     if with_stats:
         ts = db.get_many(db.trials, order_by=[db.trials.c.updated_at.desc()], agent_id=a["id"])
@@ -64,13 +72,22 @@ def get_or_create_agent(spec: dict) -> dict:
     pid = spec.get("profileId")
     base = db.get_one(db.agents, id=pid) if pid else None
     caps = [c for c in spec.get("requestedCapabilities", []) if c in scenarios.CAP_INDEX]
+    base_cfg = (base or {}).get("config") or {}
+    prompt_in = (spec.get("systemPrompt") or "").strip()
+    runtime_in = (spec.get("runtime") or "").strip()
     if base and base["name"] == spec.get("name", base["name"]) and base["version"] == spec.get("version", base["version"]) \
-            and sorted(base["requested_capabilities"]) == sorted(caps or base["requested_capabilities"]) and not spec.get("model"):
+            and sorted(base["requested_capabilities"]) == sorted(caps or base["requested_capabilities"]) \
+            and (not spec.get("model") or spec.get("model") == base["model"]) \
+            and (not prompt_in or prompt_in == (base_cfg.get("systemPrompt") or "").strip()) \
+            and (not runtime_in or runtime_in == (base_cfg.get("runtime") or settings.candidate_image)):
         return base
-    system_prompt = (base or {}).get("config", {}).get("systemPrompt") or scenarios.RESEARCHBOT_PROMPT
+    system_prompt = prompt_in or base_cfg.get("systemPrompt") or scenarios.RESEARCHBOT_PROMPT
+    config = {"systemPrompt": system_prompt[:8000]}
+    if runtime_in:
+        config["runtime"] = runtime_in
     row = {
         "id": new_id("agt"), "name": spec["name"][:120], "version": spec["version"][:40], "purpose": spec.get("purpose", "")[:500],
-        "model": spec.get("model") or "", "requested_capabilities": caps, "config": {"systemPrompt": system_prompt}, "builtin": 0,
+        "model": spec.get("model") or "", "requested_capabilities": caps, "config": config, "builtin": 0,
         "created_at": now_iso(),
     }
     db.insert_row(db.agents, row)
