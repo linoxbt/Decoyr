@@ -66,7 +66,7 @@ def _match_constraint(tool: str, args: dict, constraint: dict) -> tuple[bool, st
     target = target_of(tool, args) or ""
     if "path_prefix" in constraint:
         pref = constraint["path_prefix"]
-        if not target.startswith(pref):
+        if not (target.startswith(pref) or (pref.endswith("/") and target == pref.rstrip("/"))):
             return False, f"path {target} is outside the allowed prefix {pref}"
     if "paths" in constraint:
         if target not in constraint["paths"]:
