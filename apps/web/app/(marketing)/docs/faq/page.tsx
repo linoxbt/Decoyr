@@ -1,10 +1,8 @@
-import Link from "next/link";
 import type { Metadata } from "next";
-import { CtaBand, PageHero, Section } from "@/components/marketing/Section";
-import { buttonClass } from "@/components/ui/Button";
+import { DocPage, DocSection } from "@/components/docs/Doc";
 
 export const metadata: Metadata = {
-  title: "FAQ",
+  title: "FAQ — Docs",
   description: "Answers about Decoyr: what is tested, how the sandbox and Guard work, what the Passport claims and doesn't, inference, deployment and data handling.",
 };
 
@@ -47,49 +45,26 @@ const GROUPS: { title: string; items: [string, string][] }[] = [
   },
 ];
 
-export default function FaqPage() {
-  return (
-    <>
-      <PageHero
-        eyebrow="FAQ"
-        title="Frequently asked questions."
-        lead="Straight answers about what Decoyr tests, how it keeps the agent contained, and what its results do and don't mean."
-      >
-        <Link href="/docs" className={buttonClass("secondary", "lg")}>Documentation</Link>
-        <Link href="/security" className={buttonClass("ghost", "lg")}>Security model</Link>
-      </PageHero>
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z]+/g, "-").replace(/(^-|-$)/g, "");
 
-      <Section>
-        <div className="grid gap-12 lg:grid-cols-[220px_1fr]">
-          <nav aria-label="FAQ sections" className="hidden lg:block">
-            <ul className="sticky top-20 space-y-1.5 text-[13px]">
-              {GROUPS.map((g) => (
-                <li key={g.title}><a href={`#${g.title.toLowerCase().replace(/[^a-z]+/g, "-")}`} className="text-muted hover:text-text">{g.title}</a></li>
-              ))}
-            </ul>
-          </nav>
-          <div className="space-y-12">
-            {GROUPS.map((g) => (
-              <section key={g.title} id={g.title.toLowerCase().replace(/[^a-z]+/g, "-")} className="scroll-mt-20">
-                <h2 className="text-[20px] font-semibold tracking-[-0.015em]">{g.title}</h2>
-                <div className="mt-4 divide-y divide-border rounded-[8px] border border-border">
-                  {g.items.map(([q, a]) => (
-                    <details key={q} className="group px-5 py-4">
-                      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[14.5px] font-medium [&::-webkit-details-marker]:hidden">
-                        {q}
-                        <span className="text-[18px] leading-none text-faint transition-transform group-open:rotate-45" aria-hidden>+</span>
-                      </summary>
-                      <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-muted">{a}</p>
-                    </details>
-                  ))}
-                </div>
-              </section>
+export default function Faq() {
+  return (
+    <DocPage path="/docs/faq" title="FAQ" lead="Straight answers about what Decoyr tests, how it keeps the agent contained, and what its results do and don't mean.">
+      {GROUPS.map((g) => (
+        <DocSection key={g.title} id={slug(g.title)} title={g.title}>
+          <div className="divide-y divide-border rounded-[8px] border border-border">
+            {g.items.map(([q, a]) => (
+              <details key={q} className="group px-4 py-3.5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[14.5px] font-medium text-text [&::-webkit-details-marker]:hidden">
+                  {q}
+                  <span className="text-[18px] leading-none text-faint transition-transform group-open:rotate-45" aria-hidden>+</span>
+                </summary>
+                <p className="mt-2 text-[14px] leading-relaxed text-muted">{a}</p>
+              </details>
             ))}
           </div>
-        </div>
-      </Section>
-
-      <CtaBand title="Still curious? Run it." lead="The fastest answer to most questions is watching a trial end to end." secondary={{ href: "/how-it-works", label: "How it works" }} />
-    </>
+        </DocSection>
+      ))}
+    </DocPage>
   );
 }

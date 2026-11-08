@@ -33,7 +33,7 @@ const TOUR = [
     title: "A complete company that doesn't exist",
     body: "Acme Labs has a release repository, internal docs, engineering chat, a secret store and its own network. Every byte is synthetic and rendered from a seed, then persisted so every replay sees exactly the same world.",
     points: ["Honeycredentials that look real and are tracked everywhere", "Decoy files and restricted documents to measure scope creep", "Synthetic hosts behind a controlled egress proxy; no real internet"],
-    href: "/scenarios",
+    href: "/docs/scenarios",
     link: "Explore the scenarios",
     preview: <WorldPreview />,
   },
@@ -51,7 +51,7 @@ const TOUR = [
     title: "A policy machines enforce, not a prompt",
     body: "The result compiles into decoyr.guard.v1: an explicit allowlist with constraints, a default-deny everything else, and run limits. It is enforced in MCP middleware before any tool runs and again at the egress proxy.",
     points: ["Default deny for tools and network", "Rules name where they are enforced", "Versioned and hashed; recalibrate without losing history"],
-    href: "/docs#guard",
+    href: "/docs/authority#guard",
     link: "Read the Guard reference",
     preview: <GuardPreview />,
   },
@@ -60,7 +60,7 @@ const TOUR = [
     title: "Proof by replaying the same attack",
     body: "Same agent, same world bytes, same seed, same task, same poisoned README, but now with the Guard on. The legitimate task must still pass, and every tested security assertion must pass too.",
     points: ["Divergence point pinpointed in the trace", "Recovery after denial is measured, not assumed", "If the Guard breaks the task, Decoyr widens the narrowest safe capability"],
-    href: "/how-it-works",
+    href: "/docs/how-it-works",
     link: "How replay works",
     preview: <ReplayPreview />,
   },
@@ -122,7 +122,7 @@ export default function Landing() {
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:40px_40px] opacity-50 [mask-image:radial-gradient(ellipse_at_top_left,black_25%,transparent_70%)]" />
         <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 md:px-6 lg:grid-cols-[1.05fr_1fr] lg:py-24">
           <div>
-            <Link href="/how-it-works" className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-[12px] text-muted hover:text-text">
+            <Link href="/docs/how-it-works" className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-[12px] text-muted hover:text-text">
               <span className="size-1.5 rounded-full bg-success" aria-hidden /> Agent trust calibration, built on Vultr <ArrowRight className="size-3" aria-hidden />
             </Link>
             <h1 className="mt-5 text-[38px] font-semibold leading-[1.06] tracking-[-0.03em] md:text-[54px]">Give your AI agent a fake company before you give it yours.</h1>
@@ -131,7 +131,7 @@ export default function Landing() {
             </p>
             <div className="mt-8 flex flex-wrap items-start gap-3">
               <PreparedDemoButton label="Test an agent" variant="primary" size="lg" />
-              <Link href="/how-it-works" className={buttonClass("secondary", "lg")}>See how it works</Link>
+              <Link href="/docs/how-it-works" className={buttonClass("secondary", "lg")}>See how it works</Link>
             </div>
             <ul className="mt-8 grid max-w-lg grid-cols-2 gap-x-6 gap-y-2 text-[13px] text-muted">
               {["Fully synthetic world", "Machine-enforced Guard", "Same-seed replay proof", "Evidence for every claim"].map((t) => (
@@ -180,7 +180,7 @@ export default function Landing() {
           eyebrow="The calibration loop"
           title="Eight steps from untrusted agent to proven policy."
           lead="One excellent, reproducible trial instead of a benchmark of dozens. Every step produces evidence the next one builds on."
-          action={<TextLink href="/how-it-works">Walk through each step</TextLink>}
+          action={<TextLink href="/docs/how-it-works">Walk through each step</TextLink>}
         />
         <ol className="grid gap-px overflow-hidden rounded-[8px] border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
           {LOOP.map(([s, d], i) => (
@@ -222,7 +222,7 @@ export default function Landing() {
           eyebrow="Security model"
           title="Built so the agent under test can't hurt the tester."
           lead="Trusted and untrusted zones are separated by process, container, network and credential boundaries."
-          action={<TextLink href="/security">Read the security model</TextLink>}
+          action={<TextLink href="/docs/security">Read the security model</TextLink>}
         />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {BOUNDARIES.map((b) => <Card key={b.t} icon={b.icon} title={b.t}>{b.d}</Card>)}
@@ -260,7 +260,7 @@ export default function Landing() {
         <SectionHeader
           eyebrow="Architecture"
           title="Vultr runs the control plane, the inference and the sandbox."
-          action={<TextLink href="/architecture">Full architecture</TextLink>}
+          action={<TextLink href="/docs/architecture">Full architecture</TextLink>}
         />
         <div className="rounded-[8px] border border-border bg-surface p-4"><ArchitectureDiagram /></div>
       </Section>
@@ -280,7 +280,7 @@ export default function Landing() {
             <Eyebrow>FAQ</Eyebrow>
             <h2 className="mt-2 text-[24px] font-semibold tracking-[-0.02em] md:text-[28px]">Questions teams ask first.</h2>
             <p className="mt-2 text-[14.5px] text-muted">Straight answers about scope, safety and what Decoyr does not claim.</p>
-            <div className="mt-5"><TextLink href="/faq">All questions</TextLink></div>
+            <div className="mt-5"><TextLink href="/docs/faq">All questions</TextLink></div>
           </div>
           <div className="divide-y divide-border rounded-[8px] border border-border bg-surface">
             {FAQ_TEASER.map(([q, a]) => (

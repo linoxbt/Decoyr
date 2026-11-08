@@ -26,8 +26,8 @@ export default function AboutPage() {
         title="Trust is something you calibrate, not something you grant."
         lead="Decoyr started from a simple observation: organizations hand autonomous agents broad access before anyone has watched what those agents do when the data they read starts giving orders."
       >
-        <Link href="/how-it-works" className={buttonClass("primary", "lg")}>How it works</Link>
-        <Link href="/security" className={buttonClass("secondary", "lg")}>Security model</Link>
+        <Link href="/docs/how-it-works" className={buttonClass("primary", "lg")}>How it works</Link>
+        <Link href="/docs/security" className={buttonClass("secondary", "lg")}>Security model</Link>
       </PageHero>
 
       <Section>

@@ -6,11 +6,9 @@ import { PreparedDemoButton } from "@/components/trial/PreparedDemoButton";
 
 export const NAV = [
   { href: "/product", label: "Product" },
-  { href: "/how-it-works", label: "How it works" },
-  { href: "/scenarios", label: "Scenarios" },
-  { href: "/security", label: "Security" },
   { href: "/use-cases", label: "Use cases" },
   { href: "/docs", label: "Docs" },
+  { href: "/about", label: "About" },
 ];
 
 const FOOTER: { title: string; links: { href: string; label: string }[] }[] = [
@@ -18,25 +16,27 @@ const FOOTER: { title: string; links: { href: string; label: string }[] }[] = [
     title: "Product",
     links: [
       { href: "/product", label: "Overview" },
-      { href: "/how-it-works", label: "How it works" },
-      { href: "/scenarios", label: "Scenarios" },
-      { href: "/app/trials", label: "Trials console" },
-    ],
-  },
-  {
-    title: "Trust",
-    links: [
-      { href: "/security", label: "Security model" },
-      { href: "/architecture", label: "Architecture" },
-      { href: "/faq", label: "FAQ" },
-    ],
-  },
-  {
-    title: "Resources",
-    links: [
-      { href: "/docs", label: "Documentation" },
       { href: "/use-cases", label: "Use cases" },
+      { href: "/app/trials", label: "Trials console" },
       { href: "/about", label: "About" },
+    ],
+  },
+  {
+    title: "Docs",
+    links: [
+      { href: "/docs", label: "Introduction" },
+      { href: "/docs/quickstart", label: "Quickstart" },
+      { href: "/docs/how-it-works", label: "How it works" },
+      { href: "/docs/scenarios", label: "Scenarios" },
+    ],
+  },
+  {
+    title: "Trust & reference",
+    links: [
+      { href: "/docs/security", label: "Security model" },
+      { href: "/docs/architecture", label: "Architecture" },
+      { href: "/docs/api", label: "API reference" },
+      { href: "/docs/faq", label: "FAQ" },
     ],
   },
 ];
@@ -61,7 +61,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                 <Menu className="size-4" aria-hidden />
               </summary>
               <nav aria-label="Mobile" className="absolute right-0 mt-2 w-56 rounded-[8px] border border-border bg-surface p-1.5 shadow-lg">
-                {[...NAV, { href: "/architecture", label: "Architecture" }, { href: "/faq", label: "FAQ" }, { href: "/about", label: "About" }, { href: "/app/trials", label: "Trials console" }].map((n) => (
+                {[...NAV, { href: "/docs/how-it-works", label: "How it works" }, { href: "/docs/security", label: "Security model" }, { href: "/app/trials", label: "Trials console" }].map((n) => (
                   <Link key={n.href} href={n.href} className="block rounded-[6px] px-3 py-2 text-[13px] text-text hover:bg-surface-2">{n.label}</Link>
                 ))}
               </nav>
