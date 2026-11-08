@@ -20,6 +20,7 @@ export default function Api() {
           [<M key="3" m="GET" />, "/scenarios", "Worlds, tasks, packs, capabilities, builtin agents, limits"],
           [<M key="4" m="GET" />, "/agents", "Agent profiles with trial stats"],
           [<M key="5" m="GET" />, "/agents/{id}", "Agent, its trials, latest Passport"],
+          [<M key="6" m="GET" />, "/models", "Chat models with tool calling an agent can use"],
         ]} />
       </DocSection>
 
@@ -47,7 +48,9 @@ export default function Api() {
           [<M key="3" m="GET" />, "/trials/{id}/guard", "Guard (404 until calibrated)"],
           [<M key="4" m="POST" />, "/trials/{id}/replay", "Starts the guarded replay (409 without a Guard)"],
           [<M key="5" m="GET" />, "/trials/{id}/replay", "Replay comparison"],
-          [<M key="6" m="GET" />, "/trials/{id}/passport", "Passport"],
+          [<M key="6" m="GET" />, "/trials/{id}/passport", "Passport, with agent fingerprint and Ed25519 signature"],
+          [<M key="8" m="GET" />, "/passports/public-key", "Public key that signs this deployment's Passports"],
+          [<M key="9" m="POST" />, "/passports/verify", "Verify a Passport document's signature"],
           [<M key="7" m="POST" />, "/demo/reset", "Resets demo trials (header X-Decoyr-Admin)"],
         ]} />
       </DocSection>

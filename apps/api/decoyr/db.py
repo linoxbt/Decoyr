@@ -139,6 +139,13 @@ passports = Table(
     Column("generated_at", String(40), nullable=False),
 )
 
+keys = Table(
+    "keys", metadata,
+    Column("name", String(80), primary_key=True),
+    Column("value", Text, nullable=False),
+    Column("created_at", String(40), nullable=False),
+)
+
 JSON_COLS = {"requested_capabilities", "config", "scenario_pack", "sandbox", "assertions", "flags", "evidence", "data", "rules"}
 
 _engine: Engine | None = None

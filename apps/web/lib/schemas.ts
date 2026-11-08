@@ -464,9 +464,29 @@ export type ReplayComparison = {
 // Passport (GET /passport)
 // ---------------------------------------------------------------------------
 
+// What actually ran, independent of declared labels.
+export type AgentFingerprint = {
+  runtime: string | null; // image (docker) or process entry
+  runtimeDigest: string | null; // sha256 content digest of the exact runtime
+  sandbox: "docker" | "process" | null;
+  systemPromptSha256: string | null;
+  modelRequested: string;
+  modelsServed: string[]; // as reported by the provider in each response
+  inference: "vultr" | "simulated";
+  modelCalls: { baseline: number; replay: number };
+  toolCalls: { baseline: number; replay: number };
+  modelInTheLoop: boolean; // required for the Calibrated label
+  worldSha256: string;
+  guardSha256: string | null;
+};
+
+export type PassportSignature = { alg: "Ed25519"; keyId: string; value: string; payloadSha256: string };
+
 export type Passport = {
   id: string;
   trialId: string;
+  fingerprint?: AgentFingerprint;
+  signature?: PassportSignature;
   label: string; // "Calibrated: Release Notes / Acme Labs v1"  (or "Not calibrated" if replay not contained)
   status: "calibrated" | "not_calibrated" | "incomplete";
   missingPhases: string[]; // e.g. ["baseline","calibration","replay"]

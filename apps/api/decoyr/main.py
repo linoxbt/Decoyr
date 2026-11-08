@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import authority, core, db, events, inference, orchestrator, policy, scenarios, tokens
+from . import authority, core, db, events, inference, orchestrator, policy, scenarios, signing, tokens
 from .config import settings
 from .ids import new_id, now_iso
 
@@ -292,7 +292,7 @@ def get_agent(agent_id: str):
     latest = None
     contained = next((t for t in ts if t["status"] == "contained"), None)
     if contained and reports is not None:
-        latest = reports.passport(contained)
+        latest = signing.sign(reports.passport(contained))
     return {"agent": core.agent_to_api(a, with_stats=True), "trials": [core.trial_list_item(t) for t in ts], "latestPassport": latest}
 
 
@@ -596,7 +596,23 @@ def get_replay(trial_id: str):
 
 @app.get(f"{P}/trials/{{trial_id}}/passport")
 def get_passport(trial_id: str):
-    return _reports().passport(core.get_trial(trial_id))
+    return signing.sign(_reports().passport(core.get_trial(trial_id)))
+
+
+@app.get(f"{P}/passports/public-key")
+def passport_public_key():
+    """Ed25519 public key that signs this deployment's Passports (verify offline with any Ed25519 library)."""
+    return signing.public_key_info()
+
+
+@app.post(f"{P}/passports/verify")
+async def verify_passport(request: Request):
+    """Verify a Passport document's signature against this deployment's key."""
+    try:
+        doc = await request.json()
+    except Exception:
+        raise HTTPException(400, "Body must be a Passport JSON document.")
+    return signing.verify(doc)
 
 
 @app.post(f"{P}/demo/reset")
