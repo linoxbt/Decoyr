@@ -50,6 +50,9 @@ export type AgentProfile = {
   trialCount?: number; // only on GET /agents
   lastTestedAt?: string | null;
   latestCalibration?: string | null; // e.g. "Calibrated: Release Notes / Acme Labs v1"
+  systemPrompt?: string | null; // raw only for built-in profiles; null for user agents
+  systemPromptSha256?: string | null;
+  runtime?: string; // agent runtime image
   createdAt: string;
 };
 
@@ -80,6 +83,7 @@ export type ScenarioCatalog = {
   packs: ScenarioPack[];
   capabilities: CapabilityInfo[];
   builtinAgents: AgentProfile[];
+  runtimes?: { id: string; default: boolean }[];
   limits: { wallSeconds: number; memoryMb: number; cpu: number; pids: number; maxToolCalls: number };
 };
 
@@ -109,6 +113,9 @@ export type SandboxInfo = {
   hardening: string[]; // ["non-root uid 10001","cap-drop ALL","no-new-privileges","read-only rootfs","internal network"]
   destroyed: boolean;
   exitCode?: number | null;
+  logTail?: string[];
+  runtime?: string | null;
+  runtimeDigest?: string | null;
 };
 
 export type ArtifactRef = { id: string; path: string; sha256: string; size: number };
@@ -174,6 +181,7 @@ export type TrialListItem = Pick<
 > & {
   taskResult: CheckResult; // latest run
   securityResult: CheckResult; // latest run
+  purpose?: string;
 };
 
 export type CreateTrialRequest = {
@@ -183,7 +191,9 @@ export type CreateTrialRequest = {
     name: string;
     version: string;
     purpose: string;
-    model?: string;
+    model?: string; // one of GET /api/v1/models
+    systemPrompt?: string; // up to 8000 chars; "" is honoured as "no instructions"
+    runtime?: string; // one of ScenarioCatalog.runtimes
     requestedCapabilities: string[];
   };
   worldVersion: string; // "acme-labs-v1"
@@ -450,14 +460,42 @@ export type ReplayComparison = {
 // Passport (GET /passport)
 // ---------------------------------------------------------------------------
 
+// GET /api/v1/models — chat models with tool calling on Vultr Serverless Inference
+export type ModelCatalog = {
+  mode: "vultr" | "simulated";
+  provider: string;
+  default: string;
+  models: { id: string; name: string; description: string }[];
+};
+
+// What actually ran, recorded by Decoyr independently of the declared labels.
+export type AgentFingerprint = {
+  runtime: string | null;
+  runtimeDigest: string | null;
+  sandbox: "docker" | "process" | null;
+  systemPromptSha256: string | null;
+  modelRequested: string;
+  modelsServed: string[];
+  inference: "vultr" | "simulated";
+  modelCalls: { baseline: number; replay: number };
+  toolCalls: { baseline: number; replay: number };
+  modelInTheLoop: boolean;
+  worldSha256: string;
+  guardSha256: string | null;
+};
+
+export type PassportSignature = { alg: "Ed25519"; keyId: string; value: string; payloadSha256: string };
+
 export type Passport = {
   id: string;
   trialId: string;
+  fingerprint?: AgentFingerprint;
+  signature?: PassportSignature;
   label: string; // "Calibrated: Release Notes / Acme Labs v1"  (or "Not calibrated" if replay not contained)
   status: "calibrated" | "not_calibrated" | "incomplete";
   missingPhases: string[]; // e.g. ["baseline","calibration","replay"]
   generatedAt: string;
-  identity: { agent: string; version: string; purpose: string; model: string; trialId: string; trialTime: string; artifactSha256: string | null };
+  identity: { declared?: boolean; agent: string; version: string; purpose: string; model: string; trialId: string; trialTime: string; artifactSha256: string | null };
   coverage: { worldVersion: string; scenarioId: string; scenarioPack: string[]; seed: string; scenarioSha256: string; toolsTested: string[]; capabilitiesTested: string[] };
   usefulBehavior: { assertions: AssertionResult[]; artifacts: ArtifactRef[] };
   observedAuthority: { capability: string; count: number; baselineDecision: string }[];

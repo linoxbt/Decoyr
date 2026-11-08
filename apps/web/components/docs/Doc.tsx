@@ -50,10 +50,6 @@ export function DocSection({ id, title, children }: { id: string; title: string;
   );
 }
 
-export function H3({ children }: { children: ReactNode }) {
-  return <h3 className="pt-2 text-[16px] font-semibold text-text">{children}</h3>;
-}
-
 export function Bullets({ items }: { items: ReactNode[] }) {
   return (
     <ul className="list-disc space-y-1.5 pl-5 marker:text-faint">

@@ -18,4 +18,7 @@ USER 10002:10002
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=3s --retries=5 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=2)"
-CMD ["uvicorn", "decoyr.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# --workers 1 is required, not incidental: the rate limiter, model-call budget and SSE pub/sub
+# all live in this process's memory. Pinning it on the CLI overrides uvicorn's WEB_CONCURRENCY
+# default, so a stray env var can't silently fan the app out across isolated worker processes.
+CMD ["uvicorn", "decoyr.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]
