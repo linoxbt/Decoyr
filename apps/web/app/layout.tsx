@@ -3,7 +3,10 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://decoyr.vercel.app"),
   title: { default: "Decoyr — Agent Trust Calibration", template: "%s · Decoyr" },
+  openGraph: { type: "website", siteName: "Decoyr", title: "Decoyr — Agent Trust Calibration", description: "Give your AI agent a fake company before you give it yours." },
+  twitter: { card: "summary", title: "Decoyr — Agent Trust Calibration", description: "Give your AI agent a fake company before you give it yours." },
   description: "Give your AI agent a fake company before you give it yours. Decoyr attacks autonomous agents inside a synthetic enterprise, discovers the minimum authority they need, and proves the containment policy by replaying the same trial.",
 };
 
