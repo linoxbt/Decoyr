@@ -9,7 +9,7 @@ enforces that authority with a machine-checked **Guard**, and **replays the iden
 prove the Guard keeps the useful work while blocking the attack. The result is a scoped,
 evidence-backed **Agent Passport**, never a universal trust score.
 
-- **Live app (Vultr Cloud Compute):** http://108.61.245.158/
+- **Live app (Vultr Cloud Compute):** https://108-61-245-158.sslip.io
 - **Docs:** `/docs` in the app (how it works, scenarios, security model, API reference)
 - **License:** MIT
 
