@@ -40,6 +40,26 @@ def target_of(tool: str, args: dict) -> str | None:
     return None
 
 
+def constraint_label(constraint: dict | None) -> str:
+    """Human label for a Guard constraint, e.g. {"path_prefix": "/release/"} -> "/release/**"."""
+    if not constraint:
+        return "all"
+    parts = []
+    if "path_prefix" in constraint:
+        parts.append(constraint["path_prefix"].rstrip("/") + "/**")
+    if "paths" in constraint:
+        parts.append(", ".join(constraint["paths"]))
+    if "path_glob" in constraint:
+        parts.append(constraint["path_glob"])
+    if "repo" in constraint:
+        parts.append(constraint["repo"])
+    if "hosts" in constraint:
+        parts.append(", ".join(constraint["hosts"]) or "no hosts")
+    if "names" in constraint:
+        parts.append(", ".join(constraint["names"]) or "no names")
+    return "; ".join(parts) or "all"
+
+
 def _match_constraint(tool: str, args: dict, constraint: dict) -> tuple[bool, str]:
     if not constraint:
         return True, "allowed without constraint"

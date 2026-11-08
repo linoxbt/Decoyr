@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(os.environ["DECOYR_REPO_ROOT"]).resolve() if os.environ.get("DECOYR_REPO_ROOT") else Path(__file__).resolve().parents[3]
 
 
 def _int(name: str, default: int) -> int:
