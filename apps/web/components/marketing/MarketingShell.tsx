@@ -19,7 +19,7 @@ const FOOTER: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/app/trials", label: "Trials" },
       { href: "/app/trials/new", label: "New trial" },
       { href: "/app/agents", label: "Agents" },
-      { href: "/app/settings", label: "Settings" },
+      { href: "/docs/architecture", label: "System status" },
     ],
   },
   {
@@ -61,7 +61,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                 <Menu className="size-4" aria-hidden />
               </summary>
               <nav aria-label="Mobile" className="absolute right-0 mt-2 w-56 rounded-[8px] border border-border bg-surface p-1.5 shadow-lg">
-                {[...NAV, { href: "/app/settings", label: "Settings" }].map((n) => (
+                {NAV.map((n) => (
                   <Link key={n.href} href={n.href} className="block rounded-[6px] px-3 py-2 text-[13px] text-text hover:bg-surface-2">{n.label}</Link>
                 ))}
               </nav>

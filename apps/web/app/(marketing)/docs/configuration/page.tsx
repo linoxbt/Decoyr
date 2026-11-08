@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CodeFrame } from "@/components/marketing/Section";
 import { Callout, Code, DocPage, DocSection, DocTable } from "@/components/docs/Doc";
 
 export const metadata: Metadata = { title: "Configuration — Docs", description: "Environment variables for the Decoyr control plane, sandbox services and web console." };
@@ -20,7 +21,7 @@ export default function Configuration() {
             ["DECOYR_CANDIDATE_IMAGE", "Candidate image in docker mode (default decoyr/candidate-agent:latest)."],
             ["DECOYR_MCP_CONTAINER", "mcp-city container attached to each per-run network (default decoyr-mcp-city)."],
             ["DECOYR_SANDBOX_MCP_URL", "URL the candidate uses for mcp-city (docker: http://mcp-city:7100)."],
-            ["DECOYR_ADMIN_TOKEN", "Required in the X-Decoyr-Admin header for POST /demo/reset."],
+            ["DECOYR_ADMIN_TOKEN", "Operator token for POST /demo/reset (X-Decoyr-Admin header). Keep it in the control plane only."],
             ["DECOYR_PUBLIC_URL", "Console origin, allowed by CORS (needed when the trace stream goes direct)."],
             ["DECOYR_HOST_PROVIDER", "vultr, railway or local; shown on the system status."],
             ["DECOYR_MAX_CONCURRENT_RUNS", "Runs executed at once; others queue (default 3)."],
@@ -43,6 +44,13 @@ export default function Configuration() {
             ["TRIAL_RATE_PER_HOUR", "60", "Trial creation rate limit"],
           ]}
         />
+      </DocSection>
+
+      <DocSection id="demo-reset" title="Resetting the demo">
+        <p>Resetting removes the prepared-demo trials and creates a fresh one. It is an operator action: the token lives only in the control plane's environment (<Code>DECOYR_ADMIN_TOKEN</Code>) and is never entered in, or sent by, the web console.</p>
+        <CodeFrame title="terminal">{`curl -X POST https://<your-api-host>/api/v1/demo/reset \\
+  -H "X-Decoyr-Admin: $DECOYR_ADMIN_TOKEN"`}</CodeFrame>
+        <p>Without a configured token the all-in-one image generates an unguessable one at boot, which disables reset.</p>
       </DocSection>
 
       <DocSection id="web" title="Web console">

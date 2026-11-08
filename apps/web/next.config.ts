@@ -31,6 +31,8 @@ const nextConfig: NextConfig = {
       { source: "/product", destination: "/docs/product", permanent: true },
       { source: "/use-cases", destination: "/docs/use-cases", permanent: true },
       { source: "/about", destination: "/docs/about", permanent: true },
+      // The settings page was removed: system status lives on the architecture docs page.
+      { source: "/app/settings", destination: "/docs/architecture", permanent: true },
     ];
   },
   async rewrites() {

@@ -79,9 +79,6 @@ export function TrialFrame({ children }: { children: ReactNode }) {
                     <DropdownMenu.Item className="cursor-pointer rounded px-2 py-1.5 outline-none data-[highlighted]:bg-surface-2" onSelect={() => router.push(`${base}/passport`)}>
                       Export Passport JSON
                     </DropdownMenu.Item>
-                    <DropdownMenu.Item className="cursor-pointer rounded px-2 py-1.5 outline-none data-[highlighted]:bg-surface-2" onSelect={() => router.push(`/app/settings#reset`)}>
-                      Reset demo (team)
-                    </DropdownMenu.Item>
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
