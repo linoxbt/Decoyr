@@ -28,6 +28,9 @@ const nextConfig: NextConfig = {
       { source: "/security", destination: "/docs/security", permanent: true },
       { source: "/architecture", destination: "/docs/architecture", permanent: true },
       { source: "/faq", destination: "/docs/faq", permanent: true },
+      { source: "/product", destination: "/docs/product", permanent: true },
+      { source: "/use-cases", destination: "/docs/use-cases", permanent: true },
+      { source: "/about", destination: "/docs/about", permanent: true },
     ];
   },
   async rewrites() {

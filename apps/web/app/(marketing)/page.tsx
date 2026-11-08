@@ -42,7 +42,7 @@ const TOUR = [
     title: "Minimum authority, derived from behavior",
     body: "Decoyr doesn't ask the agent what it needs. It pairs every tool call with its outcome, separates the legitimate path from the attack path, and classifies each capability by evidence.",
     points: ["required · constrained · unnecessary · dangerous · untested", "Constraints narrowed to the exact paths, repos and files used", "Every classification links to the trace events behind it"],
-    href: "/product",
+    href: "/docs/product",
     link: "See the authority engine",
     preview: <AuthorityPreview />,
   },
@@ -69,7 +69,7 @@ const TOUR = [
     title: "A record you can hand to a reviewer",
     body: "The Passport states exactly what was tested, what was observed, the minimum authority, the Guard hash and the replay proof. It is labeled only when the replay passed both the task and security checks.",
     points: ["Scoped label, e.g. “Calibrated: Release Notes / Acme Labs v1”", "Lists findings, untested capabilities and limitations", "No 0–100 trust score, ever"],
-    href: "/product#passport",
+    href: "/docs/replay#passport",
     link: "What a Passport contains",
     preview: <PassportPreview />,
   },
@@ -131,7 +131,8 @@ export default function Landing() {
             </p>
             <div className="mt-8 flex flex-wrap items-start gap-3">
               <PreparedDemoButton label="Test an agent" variant="primary" size="lg" />
-              <Link href="/docs/how-it-works" className={buttonClass("secondary", "lg")}>See how it works</Link>
+              <Link href="/app/trials/new" className={buttonClass("secondary", "lg")}>Configure a trial</Link>
+              <Link href="/app/trials" className={buttonClass("ghost", "lg")}>Open the console <ArrowRight className="size-4" aria-hidden /></Link>
             </div>
             <ul className="mt-8 grid max-w-lg grid-cols-2 gap-x-6 gap-y-2 text-[13px] text-muted">
               {["Fully synthetic world", "Machine-enforced Guard", "Same-seed replay proof", "Evidence for every claim"].map((t) => (
@@ -267,7 +268,7 @@ export default function Landing() {
 
       {/* Personas */}
       <Section>
-        <SectionHeader eyebrow="Who it's for" title="One trial, four audiences." action={<TextLink href="/use-cases">Explore use cases</TextLink>} />
+        <SectionHeader eyebrow="Who it's for" title="One trial, four audiences." action={<TextLink href="/docs/use-cases">Explore use cases</TextLink>} />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {PERSONAS.map((p) => <Card key={p.t} icon={p.icon} title={p.t}>{p.d}</Card>)}
         </div>

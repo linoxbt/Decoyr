@@ -7,6 +7,8 @@ export const DOCS_NAV: DocGroup[] = [
     title: "Getting started",
     links: [
       { href: "/docs", title: "Introduction" },
+      { href: "/docs/product", title: "Product overview" },
+      { href: "/docs/use-cases", title: "Use cases" },
       { href: "/docs/quickstart", title: "Quickstart" },
       { href: "/docs/configuration", title: "Configuration" },
       { href: "/docs/deployment", title: "Deployment" },
@@ -35,7 +37,13 @@ export const DOCS_NAV: DocGroup[] = [
       { href: "/docs/events", title: "Trace events" },
     ],
   },
-  { title: "Help", links: [{ href: "/docs/faq", title: "FAQ" }] },
+  {
+    title: "Help",
+    links: [
+      { href: "/docs/faq", title: "FAQ" },
+      { href: "/docs/about", title: "About" },
+    ],
+  },
 ];
 
 export const DOCS_FLAT: (DocLink & { group: string })[] = DOCS_NAV.flatMap((g) => g.links.map((l) => ({ ...l, group: g.title })));

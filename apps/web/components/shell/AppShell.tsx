@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { FlaskConical, Bot, Network, Settings, Menu, X } from "lucide-react";
+import { BookOpen, FlaskConical, Bot, Settings, Menu, X } from "lucide-react";
 import { PreparedDemoButton } from "@/components/trial/PreparedDemoButton";
 import { Logo } from "./Logo";
 import { cn } from "@/components/ui/cn";
@@ -12,8 +12,8 @@ import { useSystem } from "@/lib/api/hooks";
 const NAV = [
   { href: "/app/trials", label: "Trials", icon: FlaskConical },
   { href: "/app/agents", label: "Agents", icon: Bot },
-  { href: "/docs/architecture", label: "Architecture", icon: Network },
   { href: "/app/settings", label: "Settings", icon: Settings },
+  { href: "/docs", label: "Docs", icon: BookOpen },
 ];
 
 function NavList({ onNavigate, collapsedOnLg }: { onNavigate?: () => void; collapsedOnLg?: boolean }) {
