@@ -1,8 +1,17 @@
 #cloud-config
-# Decoyr control plane VM (Ubuntu 24.04 LTS). Rendered by provision.sh:
-#   __REPO_URL__ / __REPO_REF__ / __DECOYR_DOMAIN__ are substituted before upload.
-# Secrets are generated ON the VM (never in user-data). The Vultr Serverless Inference key is
-# pushed afterwards with deploy.sh (it lives only in /opt/decoyr/infra/docker/.env, mode 600).
+# Decoyr control plane VM (Ubuntu 24.04 LTS). Rendered by provision.sh, which substitutes
+# __REPO_URL__, __REPO_REF__, __DECOYR_DOMAIN__ and __BOOTSTRAP_B64__ before upload.
+#
+# Secrets: the internal signing key, Postgres password and admin token are generated ON the VM.
+# __BOOTSTRAP_B64__ carries only the optional Vultr Serverless Inference key, model and the ops
+# status token; it is written to /etc/decoyr/bootstrap.env (0600) and merged into the compose .env.
+# The metadata service that serves user-data is reachable from trusted containers only: candidates
+# run on internal per-run networks with no route to it (tests/containment/run.sh checks this).
+#
+# Without SSH access, the VM manages itself:
+#   * decoyr-sync (cron, every 2 min) pulls __REPO_REF__ and rebuilds/restarts when it changes;
+#   * decoyr-ops-snapshot (cron, every minute) publishes boot/sync/container logs under
+#     /_ops/<ops token>/ (served by a tiny boot server until Caddy is up, then by Caddy).
 package_update: true
 package_upgrade: false
 packages:
@@ -12,8 +21,13 @@ packages:
   - jq
   - openssl
   - rsync
+  - python3
 
 write_files:
+  - path: /etc/decoyr/bootstrap.env
+    permissions: "0600"
+    encoding: b64
+    content: __BOOTSTRAP_B64__
   - path: /etc/docker/daemon.json
     permissions: "0644"
     content: |
@@ -29,10 +43,9 @@ write_files:
       #!/usr/bin/env bash
       # Safety net for trial teardown (the orchestrator destroys run containers/networks itself).
       set -euo pipefail
-      docker ps -aq --filter "name=decoyr-run-" --filter "status=exited" | xargs -r docker rm -f >/dev/null 2>&1 || true
-      docker ps -aq --filter "name=decoyr-run-" --filter "status=dead" | xargs -r docker rm -f >/dev/null 2>&1 || true
-      for net in $(docker network ls -q --filter "name=decoyr-run-"); do
-        # only remove networks with no candidate attached (mcp-city alone means a leaked network)
+      docker ps -aq --filter "label=decoyr.run" --filter "status=exited" | xargs -r docker rm -f >/dev/null 2>&1 || true
+      docker ps -aq --filter "label=decoyr.run" --filter "status=dead" | xargs -r docker rm -f >/dev/null 2>&1 || true
+      for net in $(docker network ls -q --filter "label=decoyr.run"); do
         attached=$(docker network inspect -f '{{range .Containers}}{{.Name}} {{end}}' "$net" || true)
         others=$(echo "$attached" | tr ' ' '\n' | grep -v -e '^$' -e '^decoyr-mcp-city$' || true)
         if [ -z "$others" ]; then
@@ -40,12 +53,75 @@ write_files:
           docker network rm "$net" >/dev/null 2>&1 || true
         fi
       done
-  - path: /etc/cron.d/decoyr-cleanup
+  - path: /usr/local/bin/decoyr-env
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # Create/refresh infra/docker/.env: generated secrets once, bootstrap keys and DOCKER_GID every time.
+      set -euo pipefail
+      cd /opt/decoyr/infra/docker
+      setkv() { if grep -q "^$1=" .env; then sed -i "s|^$1=.*|$1=$2|" .env; else echo "$1=$2" >> .env; fi; }
+      if [ ! -f .env ]; then
+        cp .env.example .env
+        setkv DECOYR_INTERNAL_SIGNING_KEY "$(openssl rand -hex 32)"
+        setkv POSTGRES_PASSWORD "$(openssl rand -hex 24)"
+        setkv DECOYR_ADMIN_TOKEN "$(openssl rand -hex 16)"
+        setkv DECOYR_DOMAIN "__DECOYR_DOMAIN__"
+        if [ "__DECOYR_DOMAIN__" != ":80" ]; then setkv DECOYR_PUBLIC_URL "https://__DECOYR_DOMAIN__"; fi
+      fi
+      chmod 600 .env
+      if [ -s /etc/decoyr/bootstrap.env ]; then
+        while IFS='=' read -r k v; do
+          case "$k" in
+            VULTR_SERVERLESS_INFERENCE_API_KEY|DECOYR_MODEL|DECOYR_REASONING_EFFORT|DECOYR_MAX_TOKENS|DECOYR_ADMIN_TOKEN) [ -n "$v" ] && setkv "$k" "$v" ;;
+          esac
+        done < /etc/decoyr/bootstrap.env
+      fi
+      setkv DOCKER_GID "$(stat -c %g /var/run/docker.sock)"
+  - path: /usr/local/bin/decoyr-sync
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # Pull-based deploy: rebuild and restart when the tracked branch moves.
+      set -euo pipefail
+      REF="__REPO_REF__"
+      cd /opt/decoyr
+      git fetch -q --depth 1 origin "$REF"
+      if [ "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)" ] && [ "${1:-}" != "--force" ]; then exit 0; fi
+      echo "[$(date -u +%FT%TZ)] deploying $(git rev-parse --short FETCH_HEAD)"
+      git reset -q --hard FETCH_HEAD
+      /usr/local/bin/decoyr-env
+      cd infra/docker
+      docker compose --profile build build
+      docker compose up -d --remove-orphans
+      echo "[$(date -u +%FT%TZ)] deployed $(git -C /opt/decoyr rev-parse --short HEAD)"
+  - path: /usr/local/bin/decoyr-ops-snapshot
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # Publish non-secret operational status for debugging without SSH (no .env, no keys).
+      set -uo pipefail
+      TOKEN="$(sed -n 's/^DECOYR_OPS_TOKEN=//p' /etc/decoyr/bootstrap.env 2>/dev/null)"
+      [ -n "$TOKEN" ] || exit 0
+      D="/srv/opsroot/_ops/$TOKEN"; mkdir -p "$D"
+      tail -n 400 /var/log/cloud-init-output.log > "$D/cloud-init.txt" 2>/dev/null
+      tail -n 400 /var/log/decoyr-sync.log > "$D/sync.txt" 2>/dev/null
+      { date -u; git -C /opt/decoyr log -1 --oneline 2>/dev/null; echo; docker ps -a --format '{{.Names}}\t{{.Status}}\t{{.Image}}' 2>/dev/null; echo; docker network ls 2>/dev/null; } > "$D/status.txt"
+      if [ -d /opt/decoyr/infra/docker ]; then
+        (cd /opt/decoyr/infra/docker && docker compose logs --tail 250 --no-color api mcp-city egress-proxy web caddy 2>&1) > "$D/logs.txt"
+      fi
+      printf '<pre>Decoyr ops\n\n<a href="status.txt">status.txt</a>\n<a href="cloud-init.txt">cloud-init.txt</a>\n<a href="sync.txt">sync.txt</a>\n<a href="logs.txt">logs.txt</a></pre>\n' > "$D/index.html"
+  - path: /etc/cron.d/decoyr
     permissions: "0644"
     content: |
       */15 * * * * root /usr/local/bin/decoyr-cleanup
+      */2 * * * * root flock -n /run/decoyr-sync.lock /usr/local/bin/decoyr-sync >> /var/log/decoyr-sync.log 2>&1
+      * * * * * root /usr/local/bin/decoyr-ops-snapshot
 
 runcmd:
+  # Boot status page on :80 until Caddy takes over (same /_ops/<token>/ path).
+  - [bash, -c, "mkdir -p /srv/opsroot && /usr/local/bin/decoyr-ops-snapshot; systemd-run --unit=decoyr-bootlog python3 -m http.server 80 --directory /srv/opsroot"]
+  - [bash, -c, "(while sleep 20; do /usr/local/bin/decoyr-ops-snapshot; done) >/dev/null 2>&1 &"]
   - [bash, -c, "curl -fsSL https://get.docker.com | sh"]
   - [systemctl, enable, --now, docker]
   - [bash, -c, "git clone --depth 1 --branch '__REPO_REF__' '__REPO_URL__' /opt/decoyr || git clone --depth 1 '__REPO_URL__' /opt/decoyr"]
@@ -53,21 +129,10 @@ runcmd:
     - -c
     - |
       set -euo pipefail
+      /usr/local/bin/decoyr-env
       cd /opt/decoyr/infra/docker
-      if [ ! -f .env ]; then
-        cp .env.example .env
-        sed -i "s|^DECOYR_INTERNAL_SIGNING_KEY=.*|DECOYR_INTERNAL_SIGNING_KEY=$(openssl rand -hex 32)|" .env
-        sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
-        sed -i "s|^DECOYR_ADMIN_TOKEN=.*|DECOYR_ADMIN_TOKEN=$(openssl rand -hex 16)|" .env
-        sed -i "s|^DECOYR_DOMAIN=.*|DECOYR_DOMAIN=__DECOYR_DOMAIN__|" .env
-        if [ "__DECOYR_DOMAIN__" != ":80" ]; then
-          sed -i "s|^DECOYR_PUBLIC_URL=.*|DECOYR_PUBLIC_URL=https://__DECOYR_DOMAIN__|" .env
-        fi
-        chmod 600 .env
-      fi
-      # the non-root api joins the Docker socket's group (re-detected on every boot of this script)
-      sed -i "s|^DOCKER_GID=.*|DOCKER_GID=$(stat -c %g /var/run/docker.sock)|" .env
-      grep -q '^DOCKER_GID=' .env || echo "DOCKER_GID=$(stat -c %g /var/run/docker.sock)" >> .env
       docker compose --profile build build
-      docker compose up -d
+      systemctl stop decoyr-bootlog || true
+      docker compose up -d || { systemd-run --unit=decoyr-bootlog-retry python3 -m http.server 80 --directory /srv/opsroot; exit 1; }
+      /usr/local/bin/decoyr-ops-snapshot
 final_message: "Decoyr VM ready after $UPTIME seconds"
