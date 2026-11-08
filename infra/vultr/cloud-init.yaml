@@ -119,6 +119,8 @@ write_files:
       * * * * * root /usr/local/bin/decoyr-ops-snapshot
 
 runcmd:
+  # 2 GB swap so image builds fit on small plans (e.g. vc2-2c-4gb).
+  - [bash, -c, "if ! swapon --show | grep -q /swapfile; then fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab; fi"]
   # Boot status page on :80 until Caddy takes over (same /_ops/<token>/ path).
   - [bash, -c, "mkdir -p /srv/opsroot && /usr/local/bin/decoyr-ops-snapshot; systemd-run --unit=decoyr-bootlog python3 -m http.server 80 --directory /srv/opsroot"]
   - [bash, -c, "(while sleep 20; do /usr/local/bin/decoyr-ops-snapshot; done) >/dev/null 2>&1 &"]
