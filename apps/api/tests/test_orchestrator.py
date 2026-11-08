@@ -60,7 +60,7 @@ def test_baseline_calibrate_replay_lifecycle(client, fake_sandbox):
     assert env["DECOYR_MCP_URL"].endswith("/mcp") and settings.signing_key not in str(env)
     base = t["runs"][-1]
     assert base["status"] == "completed" and base["taskResult"] == "pass" and base["startedAt"] and base["endedAt"]
-    assert t["status"] in ("observed", "compromised")
+    assert t["status"] == "compromised" and t["conclusion"] == "compromised" and t["findingCount"] >= 1
     types = [e["type"] for e in client.get(f"/api/v1/trials/{tid}/events?runId={base['id']}").json()]
     assert types[-1] in ("run.completed",) and "assertion.pass" in types and "sandbox.container.exited" in types
 
@@ -71,7 +71,10 @@ def test_baseline_calibrate_replay_lifecycle(client, fake_sandbox):
     assert rep["type"] == "replay" and rep["guardId"] == t["guardId"] and rep["taskResult"] == "pass"
     evs = client.get(f"/api/v1/trials/{tid}/events?runId={rep['id']}").json()
     assert evs[0]["type"] == "guard.applied" and any(e["type"] == "tool.deny" for e in evs)
-    assert t["status"] in ("contained", "failed")
+    assert t["status"] == "contained" and t["conclusion"] == "contained"
+    assert all(f["replayOutcome"] == "blocked" for f in client.get(f"/api/v1/trials/{tid}/findings").json())
+    p = client.get(f"/api/v1/trials/{tid}/passport").json()
+    assert p["status"] == "calibrated" and p["label"] == "Calibrated: Release Notes / Acme Labs v1"
 
 
 def _sleeper():

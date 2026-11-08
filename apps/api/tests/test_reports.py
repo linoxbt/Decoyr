@@ -38,26 +38,25 @@ def test_replay_comparison_rows(client):
     assert "secrets.get" in cmp["divergence"]["description"] and cmp["divergence"]["replaySeq"]
     assert all(e["type"] != "model.request" for e in cmp["timeline"]["replay"])
     assert sum(c["inReplay"] for c in cmp["artifacts"]["expectedCommits"]) >= 5
-    # security analysis not configured yet -> containment is not claimed
-    if rows["Security outcome"]["replay"] == "NOT EVALUATED":
-        assert cmp["verdict"] == "guard_failed"
+    assert rows["Security outcome"]["baseline"] == "COMPROMISED" and rows["Security outcome"]["replay"] == "CONTAINED"
+    assert cmp["verdict"] == "contained" and cmp["verdictText"] == "Contained for this tested scope"
 
 
 def test_passport_calibrated_only_when_replay_passes(client):
     t, base, rep, gid = _baseline_and_replay(client)
     p = client.get(f"/api/v1/trials/{t['id']}/passport").json()
-    assert p["status"] in ("calibrated", "not_calibrated") and p["missingPhases"] == []
+    assert p["status"] == "calibrated" and p["missingPhases"] == []
     assert p["replayProof"]["sameSeed"] is True and p["guard"]["id"] == gid
     assert {"capability": "repo.read_file", "constraint": "/release/**"} in p["minimumViableAuthority"]
     assert "score" not in str(p).lower()
-    # force a passing replay: label must be the scoped calibration label
-    db.update_row(db.runs, "id", rep["id"], {"security_result": "pass", "task_result": "pass"})
-    db.update_row(db.runs, "id", base["id"], {"security_result": "fail"})
+    # a replay that breaks the task must not be labeled calibrated
+    db.update_row(db.runs, "id", rep["id"], {"task_result": "fail"})
     with db.engine().begin() as c:
         c.execute(db.passports.delete().where(db.passports.c.trial_id == t["id"]))
-    p = client.get(f"/api/v1/trials/{t['id']}/passport").json()
-    assert p["status"] == "calibrated" and p["label"] == "Calibrated: Release Notes / Acme Labs v1"
-    assert client.get(f"/api/v1/trials/{t['id']}/passport").json()["id"] == p["id"]
+    p2 = client.get(f"/api/v1/trials/{t['id']}/passport").json()
+    assert p2["status"] == "not_calibrated" and p2["label"] == "Not calibrated"
+    assert p["label"] == "Calibrated: Release Notes / Acme Labs v1"
+    assert client.get(f"/api/v1/trials/{t['id']}/passport").json()["id"] == p2["id"]
     g = client.get(f"/api/v1/trials/{t['id']}/guard").json()
     assert g["policy"]["version"] == "decoyr.guard.v1"
     arts = client.get(f"/api/v1/trials/{t['id']}/artifacts").json()
