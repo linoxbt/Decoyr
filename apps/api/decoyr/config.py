@@ -8,6 +8,15 @@ from pathlib import Path
 REPO_ROOT = Path(os.environ["DECOYR_REPO_ROOT"]).resolve() if os.environ.get("DECOYR_REPO_ROOT") else Path(__file__).resolve().parents[3]
 
 
+def _database_url() -> str:
+    """DATABASE_URL, normalized for SQLAlchemy + psycopg 3 (PaaS providers hand out postgres:// URLs)."""
+    url = os.environ.get("DATABASE_URL") or f"sqlite:///{REPO_ROOT / 'apps/api/decoyr.db'}"
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
+
+
 def _int(name: str, default: int) -> int:
     try:
         return int(os.environ.get(name, default))
@@ -24,7 +33,7 @@ def _float(name: str, default: float) -> float:
 
 @dataclass(frozen=True)
 class Settings:
-    database_url: str = field(default_factory=lambda: os.environ.get("DATABASE_URL", f"sqlite:///{REPO_ROOT / 'apps/api/decoyr.db'}"))
+    database_url: str = field(default_factory=_database_url)
     vultr_key: str | None = field(default_factory=lambda: os.environ.get("VULTR_SERVERLESS_INFERENCE_API_KEY") or None)
     vultr_base_url: str = field(default_factory=lambda: os.environ.get("VULTR_INFERENCE_BASE_URL", "https://api.vultrinference.com/v1"))
     model: str = field(default_factory=lambda: os.environ.get("DECOYR_MODEL", ""))
