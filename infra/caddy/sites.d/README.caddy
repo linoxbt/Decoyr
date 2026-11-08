@@ -1,0 +1,5 @@
+# Optional extra site addresses for a specific deployment, one file per site, e.g.
+#   example.com {
+#   	import decoyr
+#   }
+# The Vultr VM sets DECOYR_DOMAIN to <ip>.sslip.io automatically, so nothing is needed here for it.

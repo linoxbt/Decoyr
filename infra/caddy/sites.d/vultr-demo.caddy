@@ -1,5 +1,0 @@
-# Live Vultr deployment: HTTPS via a free sslip.io hostname that resolves to the VM's public IP
-# (108.61.245.158). Caddy obtains a Let's Encrypt certificate for it automatically.
-108-61-245-158.sslip.io {
-	import decoyr
-}
