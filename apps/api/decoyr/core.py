@@ -10,6 +10,8 @@ from . import db, inference, scenarios
 from .config import settings
 from .ids import new_id, now_iso
 
+FINAL_TRIAL_STATUSES = frozenset({"observed", "compromised", "contained", "failed"})
+
 HARDENING_DOCKER = ["non-root uid 10001", "cap-drop ALL", "no-new-privileges", "read-only rootfs", "per-run internal network (no internet)", "no Docker socket", "CPU/memory/PID limits", "wall-clock kill"]
 HARDENING_PROCESS = ["separate OS process", "minimal environment (no control-plane secrets)", "wall-clock kill", "dev mode: not a security boundary"]
 

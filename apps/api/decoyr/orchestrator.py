@@ -487,8 +487,7 @@ def _finish(run_id: str, status: str, error: str | None, evaluate: bool) -> None
     trial = core.get_trial(run["trial_id"])
     tid = trial["id"]
     ended = now_iso()
-    _update_run(run_id, status=status, ended_at=ended, error=error, started_at=run["started_at"] or ended)
-    run = db.get_one(db.runs, id=run_id)
+    started = run["started_at"] or ended
 
     results: list[dict] = []
     task_r = sec_r = "pending"
@@ -499,7 +498,13 @@ def _finish(run_id: str, status: str, error: str | None, evaluate: bool) -> None
             task_r, sec_r = _agg(results, "task"), _agg(results, "security")
         except Exception:
             log.exception("assertion evaluation failed for %s", run_id)
-    _update_run(run_id, assertions=results, task_result=task_r, security_result=sec_r)
+
+    # In-memory run reflecting the settled results, for the helpers below.
+    run = {**run, "status": status, "ended_at": ended, "started_at": started,
+           "assertions": results, "task_result": task_r, "security_result": sec_r}
+
+    # Emit every trace event while the run is still non-terminal in the DB, so no client ever sees a
+    # finished run before its assertions, findings and run.* events exist (fixes the SSE/verdict race).
     for a in results:
         if a["passed"] is None:
             continue
@@ -507,22 +512,22 @@ def _finish(run_id: str, status: str, error: str | None, evaluate: bool) -> None
                     title=f"{'PASS' if a['passed'] else 'FAIL'}: {a['label']}", decision="observed",
                     flags=[] if a["passed"] else ["attack_path"] if a["kind"] == "security" else [],
                     evidence={"assertionId": a["id"], "kind": a["kind"], "evidenceEventIds": a["evidenceEventIds"]})
-
-    run = db.get_one(db.runs, id=run_id)
     if evaluate and run["type"] == "baseline":
         _record_findings(trial, run)
     elif evaluate and run["type"] == "replay":
         _update_replay_outcomes(trial, run)
 
-    dur = None
-    if run["started_at"]:
-        dur = int((parse_iso(ended) - parse_iso(run["started_at"])).total_seconds() * 1000)
+    dur = int((parse_iso(ended) - parse_iso(started)).total_seconds() * 1000) if started else None
     ok = status == "completed"
     events.emit(tid, run_id, "orchestrator", "run.completed" if ok else "run.failed",
                 f"{run['type'].capitalize()} run {status}: task {task_r.upper()}, security {sec_r.upper()}." + (f" {error}" if error and not ok else ""),
                 title=f"{run['type'].capitalize()} run {status}", decision="observed" if ok else "error",
                 evidence={"status": status, "taskResult": task_r, "securityResult": sec_r, "durationMs": dur, "toolCalls": run["tool_calls"],
                           "modelCalls": run["model_calls"], "deniedCalls": run["denied_calls"]})
+
+    # One atomic update flips the run to its terminal status together with its results.
+    _update_run(run_id, status=status, ended_at=ended, started_at=started, error=error,
+                assertions=results, task_result=task_r, security_result=sec_r)
     _set_trial_outcome(trial, run, status, task_r, sec_r, error)
 
 
