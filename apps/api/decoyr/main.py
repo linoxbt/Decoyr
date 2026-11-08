@@ -263,7 +263,7 @@ def _docker_available() -> bool:
     return ok
 
 
-HOST_PROVIDERS = {"vultr": "Vultr Cloud Compute", "railway": "Railway"}
+HOST_PROVIDERS = {"vultr": "Vultr Cloud Compute"}
 
 
 def demo_trial_id() -> str | None:

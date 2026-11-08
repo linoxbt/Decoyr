@@ -23,7 +23,11 @@ export default function Configuration() {
             ["DECOYR_SANDBOX_MCP_URL", "URL the candidate uses for mcp-city (docker: http://mcp-city:7100)."],
             ["DECOYR_ADMIN_TOKEN", "Operator token for POST /demo/reset (X-Decoyr-Admin header). Keep it in the control plane only."],
             ["DECOYR_PUBLIC_URL", "Console origin, allowed by CORS (needed when the trace stream goes direct)."],
-            ["DECOYR_HOST_PROVIDER", "vultr, railway or local; shown on the system status."],
+            ["DECOYR_HOST_PROVIDER", "vultr or local; shown on the system status."],
+            ["DECOYR_API_KEYS", "Comma-separated keys; when set, mutating routes require X-Decoyr-Key."],
+            ["DECOYR_CANDIDATE_IMAGES", "Extra agent runtime images trials may select (operator allowlist)."],
+            ["DECOYR_DAILY_MODEL_CALLS / _IP_ACTIONS_PER_10MIN / _IP_RUNS_PER_10MIN", "Abuse limits: global daily inference budget and per-client action/run caps."],
+            ["DECOYR_REASONING_EFFORT / DECOYR_MAX_TOKENS", "Live-model reasoning effort and the per-reply token cap."],
             ["DECOYR_MAX_CONCURRENT_RUNS", "Runs executed at once; others queue (default 3)."],
           ]}
         />
@@ -50,7 +54,7 @@ export default function Configuration() {
         <p>Resetting removes the prepared-demo trials and creates a fresh one. It is an operator action: the token lives only in the control plane's environment (<Code>DECOYR_ADMIN_TOKEN</Code>) and is never entered in, or sent by, the web console.</p>
         <CodeFrame title="terminal">{`curl -X POST https://<your-api-host>/api/v1/demo/reset \\
   -H "X-Decoyr-Admin: $DECOYR_ADMIN_TOKEN"`}</CodeFrame>
-        <p>Without a configured token the all-in-one image generates an unguessable one at boot, which disables reset.</p>
+        <p>Demo reset is disabled unless an admin token is configured.</p>
       </DocSection>
 
       <DocSection id="web" title="Web console">

@@ -14,8 +14,8 @@ IMAGE="${IMAGE:-decoyr/candidate-agent:latest}"
 RUN_ID="ct$(date +%s)$$"
 RUN_NET="decoyr-run-${RUN_ID}"
 CTRL_NET="decoyr-ct-control-${RUN_ID}"
-MEM_MB="${MEM_MB:-256}"
-PIDS="${PIDS:-64}"
+MEM_MB="${MEM_MB:-${TRIAL_MEMORY_MB:-512}}"
+PIDS="${PIDS:-${TRIAL_MAX_PIDS:-128}}"
 PASS=0
 FAIL=0
 
@@ -29,7 +29,7 @@ HARDEN=(
   --cap-drop ALL
   --security-opt no-new-privileges:true
   --memory "${MEM_MB}m" --memory-swap "${MEM_MB}m"
-  --cpus 1
+  --cpus "${TRIAL_CPU_QUOTA:-1}"
   --pids-limit "$PIDS"
   --network "$RUN_NET"
   --env DECOYR_TRIAL_TOKEN=v1.synthetic.token

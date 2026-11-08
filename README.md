@@ -80,13 +80,13 @@ for its own decision) → the result is recorded with a masked preview and hash.
 
 | Path | What it is |
 |---|---|
-| `apps/api` | Control plane: public API, SSE trace stream, policy evaluation, inference relay, orchestrator, authority engine, security analysis, reports. Python/FastAPI, 24 tests. |
+| `apps/api` | Control plane: public API, SSE trace stream, policy evaluation, inference relay, orchestrator, authority engine, security analysis, reports. Python/FastAPI. |
 | `services/mcp-city` | The synthetic company over MCP Streamable HTTP (9 tools). TypeScript, MCP TS SDK v2. |
 | `services/egress-proxy` | Synthetic network; per-request policy decisions; no real I/O. |
 | `services/candidate-agent` | Reference agent runtime: MCP client + OpenAI-compatible inference loop. |
 | `apps/web` | Next.js console and docs. |
 | `packages/scenarios` | Acme Labs v1 world, rendered deterministically per trial. |
-| `infra/` | Docker Compose, Caddy, Vultr provisioning (cloud-init), all-in-one image. |
+| `infra/` | Docker Compose (segmented networks), Caddy, Vultr provisioning (cloud-init). |
 | `docs/contracts.md` | Service contracts (source of truth); shared types in `packages/schemas`. |
 
 ## The agent's real task
@@ -121,8 +121,7 @@ export DECOYR_MODEL=glm-5.3-flash
 cloud-init installs Docker, clones this repository, generates the signing key, database password
 and admin token **on the VM**, builds every image (including the candidate) and starts the stack.
 The VM then redeploys itself when `main` changes (pull every 2 minutes) and publishes non-secret
-status at `/_ops/<token>/`. See `/docs/deployment` in the app for other shapes (all-in-one image,
-separately hosted console).
+status at `/_ops/<token>/`. See `/docs/deployment` in the app for local runs and production hardening.
 
 ## Run locally
 

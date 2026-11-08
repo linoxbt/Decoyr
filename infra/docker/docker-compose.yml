@@ -3,12 +3,16 @@
 #   cd infra/docker && cp .env.example .env && docker compose build && docker compose up -d
 #
 # Trust boundaries:
-#   * `control` network: trusted services only (api, postgres, web, caddy, mcp-city, egress-proxy).
+# Networks (segmented so a compromise of one tier can't reach the next):
+#   * edge      — caddy, web, api. Internet-facing; api reaches Vultr inference from here.
+#   * data      — api, postgres. Internal (no internet). Only the api can reach the database.
+#   * sandbox   — api, mcp-city, egress-proxy. Internal (no internet). The candidate-facing services
+#                 cannot reach the database, the internet, or the cloud metadata endpoint.
 #   * Candidate containers are NOT defined here. The api (orchestrator) creates one internal
-#     (no-internet) network per run, starts the hardened candidate on it, and attaches
-#     `decoyr-mcp-city` to that network under the alias `mcp-city`. The candidate can reach
-#     nothing else: not the api, not postgres, not the internet.
-#   * Only the api gets the Docker socket. Candidates never do.
+#     per-run network, starts the hardened candidate on it, and attaches `decoyr-mcp-city` under
+#     the alias `mcp-city`. The candidate can reach nothing but mcp-city.
+#   * Only the api gets the Docker socket. Candidates never do. A compromise of the api is still
+#     host-root (socket); see docs/security for the production mitigation (socket proxy / gVisor).
 name: decoyr
 
 x-common-env: &common-env
@@ -24,7 +28,7 @@ services:
       POSTGRES_DB: decoyr
     volumes:
       - pgdata:/var/lib/postgresql/data
-    networks: [control]
+    networks: [data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U decoyr -d decoyr"]
       interval: 5s
@@ -66,6 +70,14 @@ services:
       TRIAL_CPU_QUOTA: ${TRIAL_CPU_QUOTA:-1.0}
       TRIAL_MAX_PIDS: ${TRIAL_MAX_PIDS:-128}
       TRIAL_MAX_TOOL_CALLS: ${TRIAL_MAX_TOOL_CALLS:-40}
+      TRIAL_MAX_STEPS: ${TRIAL_MAX_STEPS:-16}
+      TRIAL_DRILL_SECONDS: ${TRIAL_DRILL_SECONDS:-8}
+      TRIAL_RATE_PER_HOUR: ${TRIAL_RATE_PER_HOUR:-60}
+      DECOYR_MAX_CONCURRENT_RUNS: ${DECOYR_MAX_CONCURRENT_RUNS:-3}
+      DECOYR_IP_ACTIONS_PER_10MIN: ${DECOYR_IP_ACTIONS_PER_10MIN:-30}
+      DECOYR_IP_RUNS_PER_10MIN: ${DECOYR_IP_RUNS_PER_10MIN:-8}
+      DECOYR_DAILY_MODEL_CALLS: ${DECOYR_DAILY_MODEL_CALLS:-3000}
+      DECOYR_API_KEYS: ${DECOYR_API_KEYS:-}
       DECOYR_REASONING_EFFORT: ${DECOYR_REASONING_EFFORT:-low}
       DECOYR_MAX_TOKENS: ${DECOYR_MAX_TOKENS:-4096}
     volumes:
@@ -75,7 +87,7 @@ services:
     #   stat -c %g /var/run/docker.sock
     group_add:
       - "${DOCKER_GID:?set DOCKER_GID in .env (stat -c %g /var/run/docker.sock)}"
-    networks: [control]
+    networks: [edge, data, sandbox]
     logging: *logging
 
   mcp-city:
@@ -90,9 +102,7 @@ services:
       PORT: "7100"
       DECOYR_CONTROL_PLANE_URL: http://api:8000
       DECOYR_EGRESS_URL: http://egress-proxy:7200
-    networks:
-      control:
-        aliases: [mcp-city]
+    networks: [sandbox]
     read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
@@ -108,7 +118,7 @@ services:
       <<: *common-env
       PORT: "7200"
       DECOYR_CONTROL_PLANE_URL: http://api:8000
-    networks: [control]
+    networks: [sandbox]
     read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
@@ -123,7 +133,7 @@ services:
     environment:
       DECOYR_API_URL: http://api:8000
       NODE_ENV: production
-    networks: [control]
+    networks: [edge]
     logging: *logging
 
   caddy:
@@ -143,7 +153,7 @@ services:
       - /srv/opsroot:/srv/opsroot:ro
       - caddy_data:/data
       - caddy_config:/config
-    networks: [control]
+    networks: [edge]
     logging: *logging
 
   # Build-only: `docker compose --profile build build candidate-agent` (or `docker compose build`
@@ -158,8 +168,14 @@ services:
     command: ["true"]
 
 networks:
-  control:
-    name: decoyr-control
+  edge:
+    name: decoyr-edge
+  data:
+    name: decoyr-data
+    internal: true
+  sandbox:
+    name: decoyr-sandbox
+    internal: true
 
 # Optional extra CA bundle for TLS-intercepting build proxies (empty by default; not needed on Vultr).
 secrets:

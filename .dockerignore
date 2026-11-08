@@ -1,4 +1,4 @@
-# Root-context builds: apps/api/Dockerfile and infra/railway/Dockerfile.
+# Root-context build: apps/api/Dockerfile (needs packages/scenarios).
 **/node_modules
 **/.venv
 **/dist
