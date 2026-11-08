@@ -13,7 +13,7 @@
 #   VULTR_SSH_KEY_ID   id of an SSH key already uploaded to Vultr (recommended)
 #   REPO_URL           default: https://github.com/linoxbt/Decoyr.git
 #   REPO_REF           default: main
-#   DECOYR_DOMAIN      default: :80  (set a DNS name pointing at the VM for automatic HTTPS)
+#   DECOYR_DOMAIN      default: auto (HTTPS on <ip>.sslip.io); or a DNS name, or :80 for plain HTTP
 #   LABEL              default: decoyr-control-plane
 set -euo pipefail
 
@@ -23,7 +23,7 @@ REGION="${VULTR_REGION:-ewr}"
 PLAN="${VULTR_PLAN:-vc2-4c-8gb}"
 REPO_URL="${REPO_URL:-https://github.com/linoxbt/Decoyr.git}"
 REPO_REF="${REPO_REF:-main}"
-DOMAIN="${DECOYR_DOMAIN:-:80}"
+DOMAIN="${DECOYR_DOMAIN:-auto}"
 LABEL="${LABEL:-decoyr-control-plane}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

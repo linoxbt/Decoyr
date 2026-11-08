@@ -53,6 +53,29 @@ write_files:
           docker network rm "$net" >/dev/null 2>&1 || true
         fi
       done
+  - path: /usr/local/bin/decoyr-host
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # Print <public-ip-with-dashes>.sslip.io for this VM (Vultr metadata, falling back to the first address).
+      ip="$(curl -s -m 5 http://169.254.169.254/v1.json | jq -r '.interfaces[0].ipv4.address // empty' 2>/dev/null)"
+      [ -n "$ip" ] || ip="$(hostname -I | awk '{print $1}')"
+      echo "${ip//./-}.sslip.io"
+  - path: /usr/local/bin/decoyr-bootcaddy
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      # HTTPS status page during boot: a standalone Caddy serving /srv/opsroot on <ip>.sslip.io.
+      # It shares the compose stack's certificate volume, so the stack's Caddy reuses the certificate.
+      set -uo pipefail
+      HOST="$(/usr/local/bin/decoyr-host)"
+      mkdir -p /etc/decoyr
+      printf '%s {\n\troot * /srv/opsroot\n\tfile_server\n}\n:80 {\n\troot * /srv/opsroot\n\tfile_server\n}\n' "$HOST" > /etc/decoyr/boot.Caddyfile
+      docker volume create decoyr_caddy_data >/dev/null
+      docker rm -f decoyr-bootcaddy >/dev/null 2>&1 || true
+      docker run -d --name decoyr-bootcaddy --restart unless-stopped -p 80:80 -p 443:443 \
+        -v /etc/decoyr/boot.Caddyfile:/etc/caddy/Caddyfile:ro -v /srv/opsroot:/srv/opsroot:ro \
+        -v decoyr_caddy_data:/data caddy:2-alpine
   - path: /usr/local/bin/decoyr-env
     permissions: "0755"
     content: |
@@ -66,8 +89,11 @@ write_files:
         setkv DECOYR_INTERNAL_SIGNING_KEY "$(openssl rand -hex 32)"
         setkv POSTGRES_PASSWORD "$(openssl rand -hex 24)"
         setkv DECOYR_ADMIN_TOKEN "$(openssl rand -hex 16)"
-        setkv DECOYR_DOMAIN "__DECOYR_DOMAIN__"
-        if [ "__DECOYR_DOMAIN__" != ":80" ]; then setkv DECOYR_PUBLIC_URL "https://__DECOYR_DOMAIN__"; fi
+        DOMAIN="__DECOYR_DOMAIN__"
+        # "auto": HTTPS on <public-ip>.sslip.io, a free hostname that resolves to this VM.
+        if [ "$DOMAIN" = "auto" ]; then DOMAIN="$(/usr/local/bin/decoyr-host)"; fi
+        setkv DECOYR_DOMAIN "$DOMAIN"
+        if [ "$DOMAIN" != ":80" ]; then setkv DECOYR_PUBLIC_URL "https://$DOMAIN"; fi
       fi
       chmod 600 .env
       if [ -s /etc/decoyr/bootstrap.env ]; then
@@ -93,7 +119,12 @@ write_files:
       /usr/local/bin/decoyr-env
       cd infra/docker
       docker compose --profile build build
-      docker compose up -d --remove-orphans
+      docker rm -f decoyr-bootcaddy >/dev/null 2>&1 || true
+      if ! docker compose up -d --remove-orphans; then
+        docker compose stop caddy >/dev/null 2>&1 || true
+        /usr/local/bin/decoyr-bootcaddy >/dev/null 2>&1 || true
+        echo "[$(date -u +%FT%TZ)] compose up FAILED; boot status page restored"; exit 1
+      fi
       echo "[$(date -u +%FT%TZ)] deployed $(git -C /opt/decoyr rev-parse --short HEAD)"
   - path: /usr/local/bin/decoyr-ops-snapshot
     permissions: "0755"
@@ -110,6 +141,7 @@ write_files:
       if [ -d /opt/decoyr/infra/docker ]; then
         (cd /opt/decoyr/infra/docker && docker compose logs --tail 250 --no-color api mcp-city egress-proxy web caddy 2>&1) > "$D/logs.txt"
       fi
+      docker logs --tail 60 decoyr-bootcaddy > "$D/bootcaddy.txt" 2>&1 || true
       printf '<pre>Decoyr ops\n\n<a href="status.txt">status.txt</a>\n<a href="cloud-init.txt">cloud-init.txt</a>\n<a href="sync.txt">sync.txt</a>\n<a href="logs.txt">logs.txt</a></pre>\n' > "$D/index.html"
   - path: /etc/cron.d/decoyr
     permissions: "0644"
@@ -126,6 +158,8 @@ runcmd:
   - [bash, -c, "(while sleep 20; do /usr/local/bin/decoyr-ops-snapshot; done) >/dev/null 2>&1 &"]
   - [bash, -c, "curl -fsSL https://get.docker.com | sh"]
   - [systemctl, enable, --now, docker]
+  # Switch the status page to HTTPS (<ip>.sslip.io) as soon as Docker is up.
+  - [bash, -c, "systemctl stop decoyr-bootlog || true; /usr/local/bin/decoyr-bootcaddy"]
   - [bash, -c, "git clone --depth 1 --branch '__REPO_REF__' '__REPO_URL__' /opt/decoyr || git clone --depth 1 '__REPO_URL__' /opt/decoyr"]
   - - bash
     - -c
@@ -134,7 +168,7 @@ runcmd:
       /usr/local/bin/decoyr-env
       cd /opt/decoyr/infra/docker
       docker compose --profile build build
-      systemctl stop decoyr-bootlog || true
-      docker compose up -d || { systemd-run --unit=decoyr-bootlog-retry python3 -m http.server 80 --directory /srv/opsroot; exit 1; }
+      docker rm -f decoyr-bootcaddy >/dev/null 2>&1 || true
+      docker compose up -d || { docker compose stop caddy || true; /usr/local/bin/decoyr-bootcaddy; exit 1; }
       /usr/local/bin/decoyr-ops-snapshot
 final_message: "Decoyr VM ready after $UPTIME seconds"
