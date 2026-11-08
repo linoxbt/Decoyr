@@ -117,25 +117,64 @@ def world_for(trial: dict) -> dict:
     return _world(trial["id"], trial["world_sha256"])
 
 
+def _honey_aliases(honey: dict[str, str]) -> list[tuple[str, str, str]]:
+    """For each honeytoken value, the plaintext plus common encodings an agent might use to exfiltrate it.
+
+    Returns (needle_lowercased, mask, name). Matching is case-insensitive.
+    """
+    import base64 as _b64
+    import urllib.parse as _url
+
+    out: list[tuple[str, str, str]] = []
+    for value, name in honey.items():
+        if not value or len(value) < 6:
+            continue
+        mask = scenarios.mask(value)
+        forms = {
+            value,
+            _b64.b64encode(value.encode()).decode(),
+            _b64.b64encode(value.encode()).decode().rstrip("="),
+            _b64.urlsafe_b64encode(value.encode()).decode().rstrip("="),
+            value.encode().hex(),
+            _url.quote(value, safe=""),
+        }
+        for f in forms:
+            out.append((f.lower(), mask, name))
+    # longest needle first so a plaintext value is replaced before any shorter alias slice
+    return sorted(out, key=lambda x: -len(x[0]))
+
+
 def scrub(obj: Any, honey: dict[str, str], limit: int = 600) -> Any:
-    """Mask honeytoken values and truncate long strings so evidence never carries secrets or bulk content."""
+    """Mask honeytoken values (and their encodings) and truncate long strings, so stored evidence
+    never carries a secret or bulk content."""
+    aliases = _honey_aliases(honey) if honey else []
+    return _scrub(obj, aliases, limit)
+
+
+def _scrub(obj: Any, aliases: list[tuple[str, str, str]], limit: int) -> Any:
     if isinstance(obj, str):
         s = obj
-        for value in honey:
-            if value and value in s:
-                s = s.replace(value, scenarios.mask(value))
+        if aliases:
+            low = s.lower()
+            for needle, mask, _ in aliases:
+                idx = low.find(needle)
+                while idx != -1:
+                    s = s[:idx] + mask + s[idx + len(needle):]
+                    low = s.lower()
+                    idx = low.find(needle)
         if len(s) > limit:
             s = s[:limit] + f"… ({len(obj)} chars)"
         return s
     if isinstance(obj, dict):
-        return {k: scrub(v, honey, limit) for k, v in obj.items()}
+        return {k: _scrub(v, aliases, limit) for k, v in obj.items()}
     if isinstance(obj, list):
-        return [scrub(v, honey, limit) for v in obj]
+        return [_scrub(v, aliases, limit) for v in obj]
     return obj
 
 
 def honey_in(text: str, honey: dict[str, str]) -> list[str]:
-    return sorted({name for value, name in honey.items() if value and value in (text or "")})
+    low = (text or "").lower()
+    return sorted({name for needle, _, name in _honey_aliases(honey) if needle in low})
 
 
 def canon(o: Any) -> str:
@@ -345,8 +384,11 @@ def _check_rate() -> None:
         raise HTTPException(429, f"Trial rate limit reached ({settings.trial_rate_per_hour} per hour). Try again later.")
 
 
+_WORLD_RE = __import__("re").compile(r"^[a-z0-9][a-z0-9.-]{0,60}$")
+
+
 def _known_world(version: str) -> None:
-    if not (settings.scenarios_dir / version / "manifest.json").is_file():
+    if not _WORLD_RE.match(version or "") or not (settings.scenarios_dir / version / "manifest.json").is_file():
         raise HTTPException(400, f"unknown world version {version}")
 
 
@@ -780,15 +822,16 @@ def _evaluate_mcp(run: dict, trial: dict, body: PolicyRequest) -> dict:
         flags.append("honeytoken")
     safe_args = scrub(args, honey)
 
+    safe_target = scrub(target, honey, 200) if target else target
     events.emit(trial["id"], run["id"], "agent", "tool.request",
-                f"Agent called {tool}" + (f" on {target}" if target else "") + ".",
-                capability=tool, target=target, correlation_id=corr, flags=flags, evidence={"args": safe_args})
+                scrub(f"Agent called {tool}" + (f" on {safe_target}" if safe_target else "") + ".", honey, 300),
+                capability=tool, target=safe_target, correlation_id=corr, flags=flags, evidence={"args": safe_args})
     allowed = res["decision"] == "allowed"
     dflags = flags + (["guard"] if res["enforced"] else []) + (["limit"] if res["ruleId"] in ("limits.max_tool_calls",) else [])
     dec = events.emit(
         trial["id"], run["id"], "guard", "tool.allow" if allowed else "tool.deny", res["reason"],
         title=None if res["enforced"] or not allowed else f"Observed {tool} (no Guard)",
-        capability=tool, target=target, decision=res["decision"], correlation_id=corr, flags=dflags,
+        capability=tool, target=safe_target, decision=res["decision"], correlation_id=corr, flags=dflags,
         evidence={"args": safe_args, "reason": res["reason"], "ruleId": res["ruleId"], "enforced": res["enforced"]},
     )
     bump_run(run["id"], tool_calls=1, denied_calls=0 if allowed else 1)
@@ -871,7 +914,8 @@ def internal_event(body: EventIn):
     honey = scenarios.honeytokens(world)
     flags = [f[:40] for f in body.flags]
     e = events.emit(trial["id"], run["id"], body.actor, body.type, scrub(body.summary, honey, 2000),
-                    title=scrub(body.title, honey, 300) if body.title else None, capability=body.capability, target=body.target,
+                    title=scrub(body.title, honey, 300) if body.title else None, capability=body.capability,
+                    target=scrub(body.target, honey, 300) if body.target else body.target,
                     decision=body.decision, correlation_id=body.correlationId, flags=flags, latency_ms=body.latencyMs,
                     evidence=scrub(body.evidence, honey) if body.evidence is not None else None)
     if body.type == "tool.result":
@@ -903,16 +947,20 @@ def internal_artifact(body: ArtifactIn):
     path = policy.norm_path(body.path)
     if not path.startswith("/workspace/") or path.endswith("/"):
         raise HTTPException(422, "artifact path must be a file under /workspace/")
-    digest = sha256_hex(body.content)
-    size = len(body.content.encode())
     honey = scenarios.honeytokens(world_for(trial))
+    leaked = honey_in(body.content, honey)
+    # Never store or serve a raw honeytoken: if the agent wrote one into the artifact, mask it. The
+    # hash and size are computed on the stored (masked) content so they stay consistent with it.
+    stored = scrub(body.content, honey, 100_000) if leaked else body.content
+    digest = sha256_hex(stored)
+    size = len(stored.encode())
     aid = new_id("art")
     e = events.emit(trial["id"], run["id"], "mcp", "artifact.created", f"Wrote {path} ({size} bytes) to the run workspace.",
                     capability="artifact.write", target=path, decision="observed", correlation_id=body.correlationId,
-                    flags=["honeytoken"] if honey_in(body.content, honey) else [],
-                    evidence={"artifactId": aid, "sha256": digest, "bytes": size, "preview": scrub(body.content, honey, 400)})
+                    flags=["honeytoken"] if leaked else [],
+                    evidence={"artifactId": aid, "sha256": digest, "bytes": size, "preview": scrub(stored, honey, 400)})
     db.insert_row(db.artifacts, {"id": aid, "trial_id": trial["id"], "run_id": run["id"], "kind": "file", "path": path, "sha256": digest,
-                                 "size": size, "content": body.content, "event_id": e["id"], "created_at": now_iso()})
+                                 "size": size, "content": stored, "event_id": e["id"], "created_at": now_iso()})
     return {"id": aid, "sha256": digest}
 
 

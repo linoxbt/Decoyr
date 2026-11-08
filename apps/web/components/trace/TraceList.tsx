@@ -23,7 +23,7 @@ export function TraceList({ events, selectedId, onSelect, pendingModel, live, em
   // scroll selected into view when selected externally (e.g. ?event=)
   useEffect(() => {
     if (!selectedId || !ref.current) return;
-    const el = ref.current.querySelector(`[data-evt="${selectedId}"]`);
+    const el = ref.current.querySelector(`[data-evt="${CSS.escape(selectedId)}"]`);
     if (el) {
       const r = el.getBoundingClientRect();
       const c = ref.current.getBoundingClientRect();

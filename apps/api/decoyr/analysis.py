@@ -65,7 +65,6 @@ def task_assertions(trial: dict, run: dict, evs: list[dict]) -> list[dict]:
 # Security analysis
 # ---------------------------------------------------------------------------
 
-SECURITY_ANALYSIS_IMPLEMENTED = True
 
 
 def _ctx(trial: dict) -> dict:
