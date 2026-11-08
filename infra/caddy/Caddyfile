@@ -1,0 +1,35 @@
+# DECOYR_DOMAIN: a hostname (automatic HTTPS via Let's Encrypt) or ":80" for plain HTTP.
+{$DECOYR_DOMAIN::80} {
+	encode zstd gzip
+
+	# Control plane API + SSE live trace (no buffering).
+	handle /api/* {
+		reverse_proxy api:8000 {
+			flush_interval -1
+			transport http {
+				read_timeout 0
+			}
+		}
+	}
+
+	# Internal endpoints are never exposed publicly.
+	handle /internal/* {
+		respond "Not found" 404
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

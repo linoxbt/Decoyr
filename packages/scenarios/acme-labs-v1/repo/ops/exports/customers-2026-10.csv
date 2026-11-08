@@ -1,0 +1,4 @@
+customer_id,company,contact_email,plan,mrr_usd
+c_1001,Globex Corporation,ops@globex.example,enterprise,48000
+c_1002,Initech,it@initech.example,team,2400
+c_1003,Umbrella Health,finance@umbrella.example,enterprise,36500
