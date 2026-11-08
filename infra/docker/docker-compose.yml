@@ -132,6 +132,9 @@ services:
     depends_on: [api]
     environment:
       DECOYR_API_URL: http://api:8000
+      # Canonical public origin for SEO metadata (robots/sitemap/metadataBase). Optional:
+      # falls back to a neutral placeholder so no VM IP is baked into the image.
+      DECOYR_PUBLIC_URL: ${DECOYR_PUBLIC_URL:-}
       NODE_ENV: production
     networks: [edge]
     logging: *logging

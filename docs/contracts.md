@@ -5,21 +5,20 @@ Types referenced here live in `packages/schemas/src/index.ts`.
 ## Topology
 
 ```
-Browser ──> web (Next.js :3000) ──/api/v1/*──> api (FastAPI :8000)  [trusted control plane]
-                                                 │  docker SDK (trusted only)
-                                                 ├── postgres / sqlite
-                                                 │
-            control network (trusted) ───────────┼──────────────────────────────┐
-                                                 │                              │
-                                        mcp-city (:7100)  ──HTTP──>  egress-proxy (:7200)
-                                                 │ (also attached to each per-run network)
-            per-run network decoyr-run-<id> (internal, no internet) ────────────┤
+            edge (internet-facing)                data (internal)      sandbox (internal)
+Browser ─> caddy ─> web (:3000)          ┌─ postgres        ┌─ mcp-city (:7100) ─HTTP─> egress-proxy (:7200)
+                 └─ api (FastAPI :8000) ─┤                  │        │ (also attached to each per-run network)
+                      [trusted control]  └──────────────────┘        │
+                       │ docker SDK (trusted only)                   │
+            per-run network decoyr-run-<id> (internal, no internet) ─┤
                                                  │
                                         candidate container (node, uid 10001)
 ```
 
-The candidate container can reach **only** `mcp-city:7100` (MCP + inference relay).
-It never receives the Vultr key, the internal signing key, or the service token.
+The api bridges all three networks; postgres sits on `data` only, mcp-city/egress-proxy on
+`sandbox` only — neither tier can reach the internet or the other. The candidate container can
+reach **only** `mcp-city:7100` (MCP + inference relay) on its per-run network. It never receives
+the Vultr key, the internal signing key, or the service token.
 
 ## Environment variables
 

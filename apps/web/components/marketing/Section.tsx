@@ -10,24 +10,6 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
   return <div className={cn("text-[12px] font-semibold uppercase tracking-[0.08em] text-muted", className)}>{children}</div>;
 }
 
-/** Top-of-page hero used by every marketing page (each page stands on its own). */
-export function PageHero({ eyebrow, title, lead, children, aside }: { eyebrow: string; title: ReactNode; lead: ReactNode; children?: ReactNode; aside?: ReactNode }) {
-  return (
-    <section className="relative overflow-hidden border-b border-border">
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:40px_40px] opacity-40 [mask-image:radial-gradient(ellipse_at_top_left,black_20%,transparent_70%)]" />
-      <div className={cn("relative mx-auto max-w-6xl px-4 py-14 md:px-6 lg:py-20", aside && "grid items-center gap-10 lg:grid-cols-[1.05fr_1fr] [&>*]:min-w-0")}>
-        <div>
-          <Eyebrow>{eyebrow}</Eyebrow>
-          <h1 className="mt-3 text-[34px] font-semibold leading-[1.1] tracking-[-0.025em] md:text-[44px]">{title}</h1>
-          <div className="mt-5 max-w-2xl text-[16px] leading-relaxed text-muted">{lead}</div>
-          {children && <div className="mt-7 flex flex-wrap items-start gap-3">{children}</div>}
-        </div>
-        {aside}
-      </div>
-    </section>
-  );
-}
-
 export function Section({ children, className, tinted, id }: { children: ReactNode; className?: string; tinted?: boolean; id?: string }) {
   return (
     <section id={id} className={cn("border-b border-border", tinted && "bg-bg")}>
@@ -87,20 +69,6 @@ export function CtaBand({ title, lead, secondary }: { title: ReactNode; lead: Re
         </div>
       </div>
     </section>
-  );
-}
-
-/** Two-column definition list. */
-export function DefList({ rows, labelWidth = "200px" }: { rows: [ReactNode, ReactNode][]; labelWidth?: string }) {
-  return (
-    <dl className="divide-y divide-border rounded-[8px] border border-border bg-surface text-[13.5px]">
-      {rows.map(([k, v], i) => (
-        <div key={i} className="grid gap-1 px-4 py-3 sm:grid-cols-[var(--lw)_1fr] sm:gap-4" style={{ ["--lw" as string]: labelWidth }}>
-          <dt className="font-medium">{k}</dt>
-          <dd className="text-muted">{v}</dd>
-        </div>
-      ))}
-    </dl>
   );
 }
 
